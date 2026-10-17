@@ -27,6 +27,12 @@ if ! sudo systemctl is-active --quiet "${SERVICE_NAME}"; then
   echo "Error: el servicio ${SERVICE_NAME} no está activo." >&2
   exit 1
 fi
+RATE_LIMIT_STORAGE_URI="${RATELIMIT_STORAGE_URI:-redis://127.0.0.1:6379/0}"
+if [[ "${RATE_LIMIT_STORAGE_URI}" == redis://127.0.0.1:6379/* ]] \
+  && ! sudo systemctl is-active --quiet redis-server.service; then
+  echo "Error: Redis local no está activo; los límites de peticiones no se pueden compartir." >&2
+  exit 1
+fi
 
 DB_PATH="${DATABASE_PATH:-}"
 if [[ -n "${DB_PATH}" && -f "${DB_PATH}" ]]; then

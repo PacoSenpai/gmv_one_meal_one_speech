@@ -6,7 +6,7 @@ from datetime import date, datetime, time
 
 from flask import Blueprint, abort, current_app, g, render_template, request, send_from_directory
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Comment, Reaction, Talk, User, utc_now
 from app.services.dates import app_timezone, local_datetime, to_utc_naive
 from app.services.scheduling import is_evaluation_open, next_scheduled_talk
@@ -30,6 +30,7 @@ SPANISH_MONTHS = [
 
 
 @public_bp.get("/")
+@limiter.limit("120 per minute")
 def index():
     upcoming = (
         Talk.query.filter(Talk.status == "scheduled", Talk.event_at > utc_now())
@@ -52,6 +53,7 @@ def index():
 
 
 @public_bp.get("/charlas/<int:talk_id>")
+@limiter.limit("120 per minute")
 def talk_detail(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     can_manage_own_talk = bool(
@@ -89,13 +91,16 @@ def talk_detail(talk_id: int):
 
 
 @public_bp.get("/charlas")
+@limiter.limit("60 per minute")
 def talk_archive():
     category = request.args.get("tipo", "proximas")
     if category not in {"proximas", "realizadas"}:
         abort(400)
-    try:
-        page_number = max(1, int(request.args.get("page", 1)))
-    except ValueError:
+    page_value = request.args.get("page", "1")
+    if len(page_value) > 4 or not page_value.isdecimal():
+        abort(400)
+    page_number = int(page_value)
+    if not 1 <= page_number <= 1000:
         abort(400)
 
     if category == "proximas":
@@ -122,11 +127,16 @@ def talk_archive():
 
 
 @public_bp.get("/agenda")
+@limiter.limit("60 per minute")
 def agenda():
     today = datetime.now(app_timezone()).date()
     try:
-        year = int(request.args.get("year", today.year))
-        month = int(request.args.get("month", today.month))
+        year_value = request.args.get("year", str(today.year))
+        month_value = request.args.get("month", str(today.month))
+        if len(year_value) > 4 or len(month_value) > 2:
+            raise ValueError
+        year = int(year_value)
+        month = int(month_value)
         if not 1 <= month <= 12 or not 2000 <= year <= 2100:
             raise ValueError
     except (TypeError, ValueError):
@@ -177,6 +187,7 @@ def agenda():
 
 
 @public_bp.get("/estadisticas")
+@limiter.limit("30 per minute")
 def statistics():
     completed_talks = Talk.query.filter_by(status="completed").all()
     speaker_counts = Counter(talk.speaker_id for talk in completed_talks)

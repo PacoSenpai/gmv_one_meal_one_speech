@@ -26,8 +26,8 @@ Portal público para descubrir las exposiciones del equipo, consultar el calenda
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-export SECRET_KEY="clave-local-cambia-esto"
-export JWT_SECRET_KEY="otra-clave-local-cambia-esto"
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export JWT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export FLASK_APP=wsgi:app
 flask db upgrade
 flask create-admin
@@ -51,7 +51,7 @@ La suite contiene pruebas unitarias de programación, pruebas de integración co
 
 ## Despliegue y actualización
 
-`deploy.sh` crea el entorno virtual, configura la base de datos y las imágenes en `/var/lib/gmv-one-meal-one-speech`, instala el servicio systemd y comprueba `/api/health`. Debe ejecutarse con `sudo` desde la cuenta que será propietaria del proceso. Si el servicio ya existe, el script informa y no modifica nada.
+`deploy.sh` crea el entorno virtual, configura la base de datos y las imágenes en `/var/lib/gmv-one-meal-one-speech`, instala el servicio systemd y comprueba `/api/health`. Debe ejecutarse con `sudo` desde la cuenta que será propietaria del proceso. Si el servicio ya existe, el script informa y no modifica nada. El despliegue incluido usa Redis local: instala y activa `redis-server` antes de ejecutarlo (`sudo apt install redis-server && sudo systemctl enable --now redis-server`).
 
 Después de instalarlo, crea el administrador inicial con el mismo usuario del proceso, cargando la configuración de entorno que instaló el despliegue:
 
@@ -65,8 +65,10 @@ El servicio escucha en `127.0.0.1:8000`. Configura el acceso HTTPS y el proxy de
 
 ## Datos y configuración
 
-- Variables requeridas en producción: `SECRET_KEY`, `JWT_SECRET_KEY`, `DATABASE_URL`, `DATABASE_PATH` y `UPLOAD_FOLDER`.
-- Las cookies seguras se activan con `COOKIE_SECURE=1`.
+- Variables requeridas en producción: `SECRET_KEY`, `JWT_SECRET_KEY`, `DATABASE_URL`, `DATABASE_PATH` y `UPLOAD_FOLDER`. Las dos claves deben ser distintas y contener al menos 32 bytes aleatorios.
+- `COOKIE_SECURE=1` es obligatorio en producción. Los límites de peticiones usan `RATELIMIT_STORAGE_URI`; el despliegue configura `redis://127.0.0.1:6379/0`, compartido por los dos workers de Gunicorn. No uses `memory://` en producción. Si se utiliza Redis remoto, configura su URI y adapta la dependencia local de Redis del servicio systemd.
+- Hay un límite general de 300 solicitudes por minuto y dirección IP; el acceso tiene además límites para intentos de autenticación y registro. Los límites no se desactivan si Redis no está disponible.
+- Si hay un proxy inverso delante de Gunicorn, configura `TRUSTED_PROXY_COUNT` con el número exacto de proxies que gestionan `X-Forwarded-For`; el proxy de borde debe reemplazar/normalizar esa cabecera. El valor predeterminado `0` no confía en cabeceras reenviadas.
 - Los códigos de invitación, votos y comentarios se guardan en SQLite. Las contraseñas se almacenan con hash; los códigos de invitación se guardan como hash y las claves temporales solo se muestran al generarse.
 - La hora se almacena en UTC y se presenta en `Europe/Madrid`.
 

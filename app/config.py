@@ -5,9 +5,11 @@ from datetime import timedelta
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-change-me")
-    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
+    APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+    SECRET_KEY = os.environ.get("SECRET_KEY")
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///portal.sqlite3")
+    DATABASE_PATH = os.environ.get("DATABASE_PATH")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_TOKEN_LOCATION = ["cookies"]
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
@@ -23,8 +25,16 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "0") == "1"
     MAX_CONTENT_LENGTH = 42 * 1024 * 1024
+    MAX_FORM_MEMORY_SIZE = 128 * 1024
+    MAX_FORM_PARTS = 32
     MAX_IMAGE_SIZE = 8 * 1024 * 1024
     MAX_IMAGES_PER_TALK = 5
     MAX_IMAGE_PIXELS = 25_000_000
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI") or (
+        "redis://127.0.0.1:6379/0" if DATABASE_PATH or APP_ENV == "production" else "memory://"
+    )
+    RATELIMIT_HEADERS_ENABLED = True
+    RATELIMIT_SWALLOW_ERRORS = False
+    TRUSTED_PROXY_COUNT = int(os.environ.get("TRUSTED_PROXY_COUNT", "0"))
     TIMEZONE = "Europe/Madrid"
     JSON_SORT_KEYS = False

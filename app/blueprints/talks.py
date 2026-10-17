@@ -7,8 +7,9 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from marshmallow import ValidationError
 from werkzeug.datastructures import FileStorage
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Comment, Reaction, Talk, TalkImage, TalkResource, utc_now
+from app.rate_limits import rate_limit_principal
 from app.schemas import CommentSchema, ProposalSchema
 from app.security import roles_required
 from app.services.scheduling import is_evaluation_open, next_default_slot, occupied_default_slots
@@ -41,6 +42,7 @@ def _parse_resources(raw_value: str) -> list[tuple[str, str]]:
 
 @talks_bp.route("/proponer", methods=["GET", "POST"])
 @roles_required("member", "admin")
+@limiter.limit("5 per hour", key_func=rate_limit_principal, methods=["POST"])
 def propose():
     if request.method == "GET":
         return render_template("talks/propose.html")
@@ -101,6 +103,7 @@ def propose():
 
 @talks_bp.get("/mis-charlas")
 @roles_required("member", "admin")
+@limiter.limit("60 per minute", key_func=rate_limit_principal)
 def my_talks():
     user_id = g.current_user.id
     return render_template(
@@ -126,6 +129,7 @@ def my_talks():
 
 @talks_bp.route("/charlas/<int:talk_id>/editar", methods=["GET", "POST"])
 @roles_required("member", "admin")
+@limiter.limit("10 per hour", key_func=rate_limit_principal, methods=["POST"])
 def edit_own_talk(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.speaker_id != g.current_user.id:
@@ -215,6 +219,7 @@ def _render_edit_talk(
 
 @talks_bp.post("/charlas/<int:talk_id>/eliminar")
 @roles_required("member", "admin")
+@limiter.limit("5 per hour", key_func=rate_limit_principal)
 def delete_own_talk(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.speaker_id != g.current_user.id:
@@ -251,6 +256,7 @@ def delete_own_talk(talk_id: int):
 
 @talks_bp.post("/charlas/<int:talk_id>/ceder-turno")
 @roles_required("member", "admin")
+@limiter.limit("5 per hour", key_func=rate_limit_principal)
 def defer_one_position(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.speaker_id != g.current_user.id:
@@ -290,6 +296,7 @@ def _remove_uploaded_file(filename: str) -> None:
 
 @talks_bp.post("/charlas/<int:talk_id>/valoracion")
 @roles_required("member", "admin")
+@limiter.limit("30 per minute", key_func=rate_limit_principal)
 def react(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if not is_evaluation_open(talk):
@@ -312,6 +319,7 @@ def react(talk_id: int):
 
 @talks_bp.post("/charlas/<int:talk_id>/comentarios")
 @roles_required("member", "admin")
+@limiter.limit("10 per minute", key_func=rate_limit_principal)
 def add_comment(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if not is_evaluation_open(talk):
@@ -336,6 +344,7 @@ def add_comment(talk_id: int):
 
 @talks_bp.post("/charlas/<int:talk_id>/comentarios/<int:comment_id>/responder")
 @roles_required("member", "admin")
+@limiter.limit("10 per minute", key_func=rate_limit_principal)
 def reply_to_comment(talk_id: int, comment_id: int):
     talk = db.get_or_404(Talk, talk_id)
     comment = db.get_or_404(Comment, comment_id)

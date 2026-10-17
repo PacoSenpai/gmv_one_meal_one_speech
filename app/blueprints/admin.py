@@ -7,8 +7,9 @@ from datetime import date, datetime
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from marshmallow import ValidationError
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Comment, Invitation, Talk, User, utc_now
+from app.rate_limits import rate_limit_principal
 from app.schemas import InvitationSchema, ProposalSchema
 from app.security import roles_required
 from app.services.dates import app_timezone, local_datetime, parse_local_datetime
@@ -19,6 +20,7 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 @admin_bp.get("/")
 @roles_required("admin")
+@limiter.limit("60 per minute", key_func=rate_limit_principal)
 def dashboard():
     upcoming_talks = (
         Talk.query.filter_by(status="scheduled")
@@ -39,6 +41,7 @@ def dashboard():
 
 @admin_bp.route("/invitaciones", methods=["GET", "POST"])
 @roles_required("admin")
+@limiter.limit("10 per hour", key_func=rate_limit_principal, methods=["POST"])
 def invitations():
     if request.method == "POST":
         try:
@@ -75,6 +78,7 @@ def _invitation_list() -> list[Invitation]:
 
 @admin_bp.post("/invitaciones/<int:invitation_id>/revocar")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def revoke_invitation(invitation_id: int):
     invitation = db.get_or_404(Invitation, invitation_id)
     if invitation.used_at is not None:
@@ -88,6 +92,7 @@ def revoke_invitation(invitation_id: int):
 
 @admin_bp.get("/miembros")
 @roles_required("admin")
+@limiter.limit("60 per minute", key_func=rate_limit_principal)
 def users():
     return render_template(
         "admin/users.html",
@@ -97,6 +102,7 @@ def users():
 
 @admin_bp.post("/miembros/<int:user_id>/restablecer-contrasena")
 @roles_required("admin")
+@limiter.limit("5 per minute", key_func=rate_limit_principal)
 def reset_password(user_id: int):
     user = db.get_or_404(User, user_id)
     if not user.is_active:
@@ -116,6 +122,7 @@ def reset_password(user_id: int):
 
 @admin_bp.post("/miembros/<int:user_id>/estado")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def toggle_user_status(user_id: int):
     user = db.get_or_404(User, user_id)
     requested_status = request.form.get("active") == "1"
@@ -136,6 +143,7 @@ def toggle_user_status(user_id: int):
 
 @admin_bp.post("/miembros/<int:user_id>/rol")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def change_user_role(user_id: int):
     user = db.get_or_404(User, user_id)
     role = request.form.get("role", "")
@@ -154,6 +162,7 @@ def change_user_role(user_id: int):
 
 @admin_bp.route("/charlas/<int:talk_id>/editar", methods=["GET", "POST"])
 @roles_required("admin")
+@limiter.limit("30 per minute", key_func=rate_limit_principal, methods=["POST"])
 def edit_talk(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.status != "scheduled":
@@ -213,6 +222,7 @@ def edit_talk(talk_id: int):
 
 @admin_bp.post("/charlas/<int:talk_id>/realizada")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def mark_completed(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.status != "scheduled":
@@ -229,6 +239,7 @@ def mark_completed(talk_id: int):
 
 @admin_bp.post("/charlas/<int:talk_id>/cancelar")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def cancel_talk(talk_id: int):
     talk = db.get_or_404(Talk, talk_id)
     if talk.status != "scheduled":
@@ -241,6 +252,7 @@ def cancel_talk(talk_id: int):
 
 @admin_bp.post("/comentarios/<int:comment_id>/eliminar")
 @roles_required("admin")
+@limiter.limit("20 per minute", key_func=rate_limit_principal)
 def delete_comment(comment_id: int):
     comment = db.get_or_404(Comment, comment_id)
     talk_id = comment.talk_id

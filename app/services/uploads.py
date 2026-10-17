@@ -23,6 +23,8 @@ def save_uploaded_image(file_storage: BinaryIO) -> str:
 
     try:
         image = Image.open(file_storage.stream)
+        if image.format not in {"JPEG", "PNG", "WEBP"}:
+            raise InvalidImageError("Sube una imagen JPEG, PNG o WebP válida.")
         image.verify()
         file_storage.stream.seek(0)
         image = Image.open(file_storage.stream)

@@ -58,18 +58,23 @@ DATABASE_URL=sqlite:////var/lib/gmv-one-meal-one-speech/portal.sqlite3
 DATABASE_PATH=/var/lib/gmv-one-meal-one-speech/portal.sqlite3
 UPLOAD_FOLDER=/var/lib/gmv-one-meal-one-speech/uploads
 COOKIE_SECURE=1
+APP_ENV=production
+RATELIMIT_STORAGE_URI=redis://127.0.0.1:6379/0
+TRUSTED_PROXY_COUNT=0
 EOF
   chown root:"${APP_GROUP}" "${ENV_FILE}"
   chmod 0640 "${ENV_FILE}"
 fi
 
-set -a
-# The file is generated above and kept root-writable only.
-# shellcheck disable=SC1090
-. "${ENV_FILE}"
-set +a
-sudo -u "${APP_USER}" env DATABASE_URL="${DATABASE_URL}" UPLOAD_FOLDER="${UPLOAD_FOLDER}" \
-  "${APP_DIR}/.venv/bin/flask" --app wsgi:app db upgrade
+sudo -u "${APP_USER}" bash -c '
+  set -a
+  # The deployment-owned environment file is readable by the application group.
+  # shellcheck disable=SC1090
+  . "$1"
+  set +a
+  cd "$2"
+  exec "$2/.venv/bin/flask" --app wsgi:app db upgrade
+' _ "${ENV_FILE}" "${APP_DIR}"
 
 APP_DIR="${APP_DIR}" APP_USER="${APP_USER}" APP_GROUP="${APP_GROUP}" python3 - \
   "${APP_DIR}/deploy/gmv-one-meal-one-speech.service.in" "${SERVICE_PATH}" <<'PY'

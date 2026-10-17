@@ -5,7 +5,7 @@ from marshmallow import Schema, fields
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Talk, User, utc_now
 from app.services.scheduling import next_scheduled_talk
 
@@ -20,6 +20,7 @@ class TalkResponseSchema(Schema):
 
 
 class HealthResource(Resource):
+    @limiter.limit("120 per minute")
     def get(self) -> tuple[dict[str, str], int]:
         try:
             db.session.execute(text("SELECT 1"))
@@ -30,6 +31,7 @@ class HealthResource(Resource):
 
 
 class PublicTalksResource(Resource):
+    @limiter.limit("60 per minute")
     def get(self) -> tuple[dict[str, object], int]:
         talks = (
             Talk.query.filter(Talk.status == "scheduled", Talk.event_at > utc_now())
@@ -52,6 +54,7 @@ class PublicTalksResource(Resource):
 
 
 class PublicStatisticsResource(Resource):
+    @limiter.limit("30 per minute")
     def get(self) -> tuple[dict[str, object], int]:
         speakers = (
             User.query.join(Talk)

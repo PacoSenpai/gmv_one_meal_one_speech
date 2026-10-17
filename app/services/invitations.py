@@ -4,6 +4,9 @@ import hashlib
 import secrets
 from datetime import date, datetime, time
 
+from sqlalchemy import update
+
+from app.extensions import db
 from app.models import Invitation, utc_now
 from app.services.dates import app_timezone, to_utc_naive
 
@@ -23,8 +26,17 @@ def create_invitation_code(expires_on: date, created_by_id: int) -> tuple[Invita
     return invitation, code
 
 
-def find_valid_invitation(code: str) -> Invitation | None:
-    invitation = Invitation.query.filter_by(code_hash=hash_invitation_code(code)).first()
-    if invitation is None or invitation.used_at is not None or invitation.expires_at < utc_now():
-        return None
-    return invitation
+def consume_invitation_if_valid(code: str) -> bool:
+    """Atomically mark one valid code used within the account-creation transaction."""
+    current_time = utc_now()
+    result = db.session.execute(
+        update(Invitation)
+        .where(
+            Invitation.code_hash == hash_invitation_code(code),
+            Invitation.used_at.is_(None),
+            Invitation.expires_at >= current_time,
+        )
+        .values(used_at=current_time)
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount == 1

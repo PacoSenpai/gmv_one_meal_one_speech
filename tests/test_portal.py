@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from io import BytesIO
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import pytest
 from PIL import Image
 
+from app import create_app
 from app.extensions import db
 from app.models import Comment, Invitation, Reaction, Talk, TalkImage, TalkResource, User, utc_now
 from app.services.invitations import hash_invitation_code
@@ -16,17 +20,32 @@ def csrf_value(client) -> str:
     return cookie.value if cookie else ""
 
 
-def login(client, username="admin", password="a-very-secure-password"):
+def form_csrf_value(client, path: str) -> str:
+    response = client.get(path)
+    match = re.search(rb'name="csrf_token" value="([^"]+)"', response.data)
+    assert match, f"CSRF field not rendered on {path}"
+    return match.group(1).decode()
+
+
+def login(client, username="admin", password="a-very-secure-password", next_url=""):
+    csrf_token = form_csrf_value(client, "/login")
     return client.post(
         "/login",
-        data={"username": username, "password": password, "csrf_token": csrf_value(client)},
+        data={
+            "username": username,
+            "password": password,
+            "csrf_token": csrf_token,
+            "next": next_url,
+        },
     )
 
 
 def test_invitation_registration_is_single_use(client, app, invitation):
+    csrf_token = form_csrf_value(client, "/registro")
     response = client.post(
         "/registro",
         data={
+            "csrf_token": csrf_token,
             "invitation_code": invitation,
             "username": "new_member",
             "full_name": "New Member",
@@ -46,7 +65,7 @@ def test_invitation_registration_is_single_use(client, app, invitation):
     repeated = client.post(
         "/registro",
         data={
-            "csrf_token": csrf_value(client),
+            "csrf_token": form_csrf_value(client, "/registro"),
             "invitation_code": invitation,
             "username": "second_member",
             "password": "another-secure-password",
@@ -168,12 +187,14 @@ def test_temporary_password_requires_a_change(client, app, admin_user):
     assert login_response.status_code == 401
     # The generated password is intentionally shown once in the admin response, not stored in plaintext.
     from html import unescape
-    from re import search
 
-    generated_match = search(rb'id="generated-code">([^<]+)', response.data)
+    generated_match = re.search(rb'id="generated-code">([^<]+)', response.data)
     generated = unescape(generated_match.group(1).decode())
     member_login = login(client, "reset_me", generated)
     assert member_login.status_code == 302
+    forced_register = client.get("/registro")
+    assert forced_register.status_code == 302
+    assert "/cuenta/contrasena" in forced_register.headers["Location"]
     forced_page = client.get("/")
     assert forced_page.status_code == 302
     assert "/cuenta/contrasena" in forced_page.headers["Location"]
@@ -451,3 +472,123 @@ def test_owner_cannot_edit_or_delete_completed_talk(client, app, admin_user):
     assert delete_response.status_code == 400
     with app.app_context():
         assert db.session.get(Talk, talk_id).status == "completed"
+
+
+def test_password_change_cannot_be_forced_by_query_parameter(client, app):
+    with app.app_context():
+        user = User(username="reauth_user")
+        user.set_password("the-original-secure-password")
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    login(client, "reauth_user", "the-original-secure-password")
+    response = client.post(
+        "/cuenta/contrasena?forced=1",
+        data={
+            "csrf_token": csrf_value(client),
+            "new_password": "an-attacker-chosen-new-password",
+        },
+    )
+    assert response.status_code == 400
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        assert user.check_password("the-original-secure-password")
+        assert not user.check_password("an-attacker-chosen-new-password")
+
+
+def test_anonymous_login_and_registration_require_preauth_csrf(client, app, admin_user, invitation):
+    login_without_token = client.post(
+        "/login",
+        data={"username": "admin", "password": "a-very-secure-password"},
+    )
+    assert login_without_token.status_code == 400
+
+    register_without_token = client.post(
+        "/registro",
+        data={
+            "invitation_code": invitation,
+            "username": "csrf_missing",
+            "password": "a-different-secure-password",
+        },
+    )
+    assert register_without_token.status_code == 400
+    with app.app_context():
+        assert User.query.filter_by(username="csrf_missing").first() is None
+
+
+def test_authenticated_cookie_does_not_skip_login_csrf(client, admin_user):
+    login(client)
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "a-very-secure-password"},
+    )
+    assert response.status_code == 400
+
+
+def test_login_redirect_rejects_backslash_and_external_targets(client, admin_user):
+    for target in ("/\\attacker.example", "//attacker.example", "https://attacker.example"):
+        response = login(client, next_url=target)
+        assert response.status_code == 302
+        assert response.headers["Location"] == "/"
+
+
+def test_oversized_login_fields_are_rejected_before_password_hash_check(client, app, admin_user):
+    csrf_token = form_csrf_value(client, "/login")
+    with patch.object(User, "check_password", return_value=False) as check_password:
+        response = client.post(
+            "/login",
+            data={
+                "csrf_token": csrf_token,
+                "username": "admin",
+                "password": "x" * 257,
+            },
+        )
+    assert response.status_code == 401
+    check_password.assert_not_called()
+
+
+def test_login_rate_limit_returns_429(client):
+    csrf_token = form_csrf_value(client, "/login")
+    responses = [
+        client.post(
+            "/login",
+            data={
+                "csrf_token": csrf_token,
+                "username": "unknown_user",
+                "password": "invalid-password",
+            },
+        )
+        for _ in range(6)
+    ]
+    assert [response.status_code for response in responses[:5]] == [401] * 5
+    assert responses[5].status_code == 429
+
+
+def test_archive_page_input_is_bounded(client):
+    assert client.get("/charlas?page=999999999999999999999999").status_code == 400
+
+
+def test_production_requires_distinct_secrets_secure_cookies_and_redis(tmp_path):
+    base_config = {
+        "TESTING": False,
+        "APP_ENV": "production",
+        "SECRET_KEY": "a-secret-key-with-at-least-32-bytes",
+        "JWT_SECRET_KEY": "a-different-jwt-key-with-at-least-32-bytes",
+        "DATABASE_PATH": str(tmp_path / "production.sqlite3"),
+        "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+        "JWT_COOKIE_SECURE": True,
+        "RATELIMIT_STORAGE_URI": "memory://",
+    }
+    with pytest.raises(RuntimeError, match="Redis compartido"):
+        create_app(base_config)
+    with pytest.raises(RuntimeError, match="Redis compartido"):
+        create_app({**base_config, "TESTING": True})
+
+    insecure_config = {**base_config, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6379/0", "JWT_COOKIE_SECURE": False}
+    with pytest.raises(RuntimeError, match="COOKIE_SECURE=1"):
+        create_app(insecure_config)
+
+    same_secret_config = {**base_config, "DATABASE_PATH": None, "APP_ENV": "development", "JWT_SECRET_KEY": base_config["SECRET_KEY"]}
+    with pytest.raises(RuntimeError, match="deben ser valores distintos"):
+        create_app(same_secret_config)
