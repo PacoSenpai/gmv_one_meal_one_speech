@@ -585,10 +585,204 @@ def test_production_requires_distinct_secrets_secure_cookies_and_redis(tmp_path)
     with pytest.raises(RuntimeError, match="Redis compartido"):
         create_app({**base_config, "TESTING": True})
 
-    insecure_config = {**base_config, "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6379/0", "JWT_COOKIE_SECURE": False}
+    insecure_config = {
+        **base_config,
+        "RATELIMIT_STORAGE_URI": "redis://127.0.0.1:6379/0",
+        "JWT_COOKIE_SECURE": False,
+    }
     with pytest.raises(RuntimeError, match="COOKIE_SECURE=1"):
         create_app(insecure_config)
 
-    same_secret_config = {**base_config, "DATABASE_PATH": None, "APP_ENV": "development", "JWT_SECRET_KEY": base_config["SECRET_KEY"]}
+    same_secret_config = {
+        **base_config,
+        "DATABASE_PATH": None,
+        "APP_ENV": "development",
+        "JWT_SECRET_KEY": base_config["SECRET_KEY"],
+    }
     with pytest.raises(RuntimeError, match="deben ser valores distintos"):
         create_app(same_secret_config)
+
+
+def test_first_cli_admin_becomes_superadmin(app):
+    runner = app.test_cli_runner()
+    with patch(
+        "app.cli.getpass.getpass",
+        side_effect=["first-admin-secure-password", "first-admin-secure-password"],
+    ):
+        first_result = runner.invoke(args=["create-admin"], input="first_admin\n\n")
+    assert first_result.exit_code == 0, first_result.output
+
+    with patch(
+        "app.cli.getpass.getpass",
+        side_effect=["second-admin-secure-password", "second-admin-secure-password"],
+    ):
+        second_result = runner.invoke(args=["create-admin"], input="second_admin\n\n")
+    assert second_result.exit_code == 0, second_result.output
+    with app.app_context():
+        first_admin = User.query.filter_by(username="first_admin").one()
+        second_admin = User.query.filter_by(username="second_admin").one()
+        assert first_admin.is_superadmin
+        assert not second_admin.is_superadmin
+
+
+def test_schedule_changes_reorganize_all_future_scheduled_talks(client, app, admin_user):
+    with app.app_context():
+        speaker = db.session.get(User, admin_user)
+        now = utc_now()
+        first_talk = Talk(
+            title="Earlier queued speech",
+            description="A sufficiently detailed description for the first queued speech.",
+            event_at=now + timedelta(days=8),
+            status="scheduled",
+            speaker=speaker,
+        )
+        second_talk = Talk(
+            title="Later queued speech",
+            description="A sufficiently detailed description for the second queued speech.",
+            event_at=now + timedelta(days=200),
+            status="scheduled",
+            speaker=speaker,
+        )
+        completed_talk = Talk(
+            title="Completed speech",
+            description="A sufficiently detailed description for a completed speech.",
+            event_at=now + timedelta(days=30),
+            completed_at=now,
+            status="completed",
+            speaker=speaker,
+        )
+        cancelled_talk = Talk(
+            title="Cancelled speech",
+            description="A sufficiently detailed description for a cancelled speech.",
+            event_at=now + timedelta(days=40),
+            status="cancelled",
+            speaker=speaker,
+        )
+        past_scheduled_talk = Talk(
+            title="Past scheduled speech",
+            description="A sufficiently detailed description for a past scheduled speech.",
+            event_at=now - timedelta(days=2),
+            status="scheduled",
+            speaker=speaker,
+        )
+        db.session.add_all([first_talk, second_talk, completed_talk, cancelled_talk, past_scheduled_talk])
+        db.session.commit()
+        first_id, second_id = first_talk.id, second_talk.id
+        completed_id, cancelled_id, past_scheduled_id = (
+            completed_talk.id,
+            cancelled_talk.id,
+            past_scheduled_talk.id,
+        )
+        completed_at = completed_talk.event_at
+        cancelled_at = cancelled_talk.event_at
+        past_at = past_scheduled_talk.event_at
+
+    login(client)
+    response = client.post(
+        "/admin/agenda",
+        data={
+            "csrf_token": csrf_value(client),
+            "default_time": "14:00",
+            "slot": "2:1",
+        },
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        first_talk = db.session.get(Talk, first_id)
+        second_talk = db.session.get(Talk, second_id)
+        first_local = first_talk.event_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(
+            ZoneInfo("Europe/Madrid")
+        )
+        second_local = second_talk.event_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(
+            ZoneInfo("Europe/Madrid")
+        )
+        assert first_local.weekday() == second_local.weekday() == 2
+        assert first_local.hour == second_local.hour == 14
+        assert first_local.minute == second_local.minute == 0
+        assert first_talk.event_at < second_talk.event_at
+        assert db.session.get(Talk, completed_id).event_at == completed_at
+        assert db.session.get(Talk, cancelled_id).event_at == cancelled_at
+        assert db.session.get(Talk, past_scheduled_id).event_at == past_at
+
+
+def test_only_superadmin_can_manage_other_admins_and_reset_passwords(client, app, admin_user):
+    with app.app_context():
+        regular_admin = User(username="regular_admin", role="admin", is_superadmin=False)
+        other_admin = User(username="other_admin", role="admin", is_superadmin=False)
+        another_admin = User(username="another_admin", role="admin", is_superadmin=False)
+        member = User(username="managed_member", role="member")
+        for user, password in (
+            (regular_admin, "regular-admin-secure-password"),
+            (other_admin, "other-admin-secure-password"),
+            (another_admin, "another-admin-secure-password"),
+            (member, "managed-member-secure-password"),
+        ):
+            user.set_password(password)
+        db.session.add_all([regular_admin, other_admin, another_admin, member])
+        db.session.commit()
+        regular_admin_id = regular_admin.id
+        other_admin_id = other_admin.id
+        another_admin_id = another_admin.id
+        member_id = member.id
+
+    login(client, "regular_admin", "regular-admin-secure-password")
+    demote_response = client.post(
+        f"/admin/miembros/{other_admin_id}/rol",
+        data={"csrf_token": csrf_value(client), "role": "member"},
+    )
+    disable_response = client.post(
+        f"/admin/miembros/{other_admin_id}/estado",
+        data={"csrf_token": csrf_value(client), "active": "0"},
+    )
+    reset_response = client.post(
+        f"/admin/miembros/{member_id}/restablecer-contrasena",
+        data={"csrf_token": csrf_value(client)},
+    )
+    self_demote_response = client.post(
+        f"/admin/miembros/{regular_admin_id}/rol",
+        data={"csrf_token": csrf_value(client), "role": "member"},
+    )
+    protect_superadmin_response = client.post(
+        f"/admin/miembros/{admin_user}/rol",
+        data={"csrf_token": csrf_value(client), "role": "member"},
+    )
+    assert demote_response.status_code == 403
+    assert disable_response.status_code == 403
+    assert reset_response.status_code == 403
+    assert self_demote_response.status_code == 403
+    assert protect_superadmin_response.status_code == 403
+
+    promote_response = client.post(
+        f"/admin/miembros/{member_id}/rol",
+        data={"csrf_token": csrf_value(client), "role": "admin"},
+    )
+    assert promote_response.status_code == 302
+    client.post("/logout", data={"csrf_token": csrf_value(client)})
+
+    login(client)
+    superadmin_demote = client.post(
+        f"/admin/miembros/{other_admin_id}/rol",
+        data={"csrf_token": csrf_value(client), "role": "member"},
+    )
+    superadmin_disable = client.post(
+        f"/admin/miembros/{another_admin_id}/estado",
+        data={"csrf_token": csrf_value(client), "active": "0"},
+    )
+    superadmin_reset = client.post(
+        f"/admin/miembros/{member_id}/restablecer-contrasena",
+        data={"csrf_token": csrf_value(client)},
+    )
+    assert superadmin_demote.status_code == 302
+    assert superadmin_disable.status_code == 302
+    assert superadmin_reset.status_code == 200
+
+    with app.app_context():
+        assert db.session.get(User, admin_user).is_superadmin
+        assert db.session.get(User, admin_user).role == "admin"
+        assert db.session.get(User, regular_admin_id).role == "admin"
+        assert db.session.get(User, other_admin_id).role == "member"
+        assert not db.session.get(User, another_admin_id).is_active
+        promoted_member = db.session.get(User, member_id)
+        assert promoted_member.role == "admin"
+        assert promoted_member.must_change_password

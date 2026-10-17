@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Disponibilidad — Administración{% endblock %}
+{% block content %}
+<section class="schedule-page-intro">
+  <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Panel de administración</a>
+  <div class="schedule-hero">
+    <div class="schedule-hero-copy">
+      <span class="eyebrow"><span class="live-dot"></span> AGENDA · REGLAS RECURRENTES</span>
+      <h1>El ritmo de la<br><em>conversación.</em></h1>
+      <p>Elige cuándo nos reunimos. Define los días disponibles y la hora; nosotros ordenamos las próximas charlas.</p>
+    </div>
+    <aside class="schedule-snapshot" aria-label="Resumen de disponibilidad actual">
+      <span class="schedule-snapshot-label">CONFIGURACIÓN ACTUAL</span>
+      <div class="schedule-snapshot-count">
+        <strong data-schedule-count aria-live="polite" aria-atomic="true">{{ selected_slots|length }}</strong>
+        <span>reglas<br>activas</span>
+      </div>
+      <span class="schedule-snapshot-caption">de 35 opciones posibles</span>
+      <div class="schedule-snapshot-time">
+        <span>Hora local · Madrid</span>
+        <strong data-schedule-time>{{ default_time_value }}</strong>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<form method="post" class="schedule-settings-form" data-schedule-form data-confirm="Se reorganizarán todas las charlas futuras programadas con estas reglas. ¿Continuar?">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if errors %}
+    <div class="form-errors schedule-form-errors" role="alert">
+      {% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}
+    </div>
+  {% endif %}
+
+  <section class="schedule-config-card schedule-time-card">
+    <header class="schedule-section-heading">
+      <span class="schedule-section-index">01</span>
+      <div>
+        <span class="eyebrow">HORA DE EXPOSICIÓN</span>
+        <h2>Una hora compartida</h2>
+      </div>
+      <span class="schedule-section-meta">EUROPE<br>MADRID</span>
+    </header>
+    <div class="schedule-time-control">
+      <div class="schedule-time-description">
+        <strong>Hora predeterminada</strong>
+        <small>Todos los huecos usarán esta hora local.</small>
+      </div>
+      <label class="schedule-time-field" for="default-time">
+        <span>HORA</span>
+        <input id="default-time" type="time" name="default_time" value="{{ default_time_value }}" required>
+      </label>
+    </div>
+  </section>
+
+  <section class="schedule-config-card schedule-days-card">
+    <header class="schedule-section-heading">
+      <span class="schedule-section-index">02</span>
+      <div>
+        <span class="eyebrow">DISPONIBILIDAD MENSUAL</span>
+        <h2>Elige tus días</h2>
+      </div>
+      <span class="schedule-section-meta">35<br>POSIBILIDADES</span>
+    </header>
+
+    <div class="schedule-instruction">
+      <span class="schedule-instruction-mark" aria-hidden="true">×5</span>
+      <p id="schedule-rules-help">Marca la semana de cada día en la que puede haber una charla. Por ejemplo, selecciona las semanas 1.ª y 2.ª en la fila Martes para reservar los dos primeros martes del mes.</p>
+      <span class="schedule-instruction-tag">SELECCIÓN LIBRE</span>
+    </div>
+
+    <fieldset class="schedule-rules-fieldset" aria-describedby="schedule-rules-help">
+      <legend class="visually-hidden">Reglas recurrentes por día y semana del mes</legend>
+      <div class="schedule-weekday-list">
+        {% for weekday, label in weekdays %}
+          <div class="schedule-weekday-row">
+            <div class="schedule-weekday-name">
+              <span>{{ "%02d"|format(loop.index) }}</span>
+              <strong>{{ label }}</strong>
+            </div>
+            <div class="schedule-occurrences">
+              {% for occurrence, occurrence_label in occurrence_labels %}
+                <label class="schedule-occurrence" for="schedule-{{ weekday }}-{{ occurrence }}">
+                  <input
+                    id="schedule-{{ weekday }}-{{ occurrence }}"
+                    type="checkbox"
+                    name="slot"
+                    value="{{ weekday }}:{{ occurrence }}"
+                    aria-label="{{ label }}, semana {{ occurrence }}"
+                    {% if (weekday, occurrence) in selected_slots %}checked{% endif %}>
+                  <span class="schedule-occurrence-number">{{ occurrence_label }}</span>
+                  <span class="schedule-occurrence-caption">semana</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="schedule-footnote">
+      <span aria-hidden="true">i</span>
+      <p>Si algún mes no tiene una quinta semana de ese día, esa regla simplemente no generará un hueco ese mes.</p>
+    </div>
+  </section>
+
+  <section class="schedule-save-card">
+    <span class="schedule-save-symbol" aria-hidden="true">↻</span>
+    <div class="schedule-save-copy">
+      <span class="eyebrow">AL GUARDAR</span>
+      <p><strong>La agenda se vuelve a ordenar.</strong> Las charlas futuras conservarán su orden; las realizadas, canceladas y pasadas no se moverán.</p>
+    </div>
+    <button class="button button-dark schedule-save-button" type="submit">
+      <span>Guardar y reorganizar</span><span aria-hidden="true">↗</span>
+    </button>
+  </section>
+</form>
+{% endblock %}

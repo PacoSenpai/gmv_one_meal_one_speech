@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
+from sqlalchemy import false
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
@@ -18,6 +19,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(10), nullable=False, default="member")
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    is_superadmin = db.Column(db.Boolean, nullable=False, default=False, server_default=false())
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     auth_version = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
@@ -33,6 +35,23 @@ class User(db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+
+class ScheduleSetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    default_time = db.Column(db.Time, nullable=False, default=time(13, 30))
+
+
+class ScheduleRule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    weekday = db.Column(db.Integer, nullable=False)
+    occurrence = db.Column(db.Integer, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("weekday", "occurrence", name="uq_schedule_rule_weekday_occurrence"),
+        db.CheckConstraint("weekday >= 0 AND weekday <= 6", name="ck_schedule_rule_weekday"),
+        db.CheckConstraint("occurrence >= 1 AND occurrence <= 5", name="ck_schedule_rule_occurrence"),
+    )
 
 
 class Invitation(db.Model):

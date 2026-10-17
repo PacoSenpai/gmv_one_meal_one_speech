@@ -15,7 +15,7 @@ def register_cli_commands(app: Flask) -> None:
     @click.option("--username", prompt=True, help="Nombre de usuario del administrador.")
     @click.option("--name", prompt="Nombre completo (opcional)", default="", show_default=False)
     def create_admin(username: str, name: str) -> None:
-        """Create the first administrator without exposing a public admin signup."""
+        """Create an administrator; designate the first one as superadmin."""
         normalized_username = username.strip().lower()
         if not re.fullmatch(r"[a-z0-9_.-]{3,30}", normalized_username):
             raise click.ClickException(
@@ -27,8 +27,17 @@ def register_cli_commands(app: Flask) -> None:
         confirmation = getpass.getpass("Repite la contraseña: ")
         if password != confirmation or len(password) < 12:
             raise click.ClickException("Las contraseñas no coinciden o tienen menos de 12 caracteres.")
-        user = User(username=normalized_username, full_name=name.strip() or None, role="admin")
+        is_first_admin = User.query.filter_by(is_superadmin=True).first() is None
+        user = User(
+            username=normalized_username,
+            full_name=name.strip() or None,
+            role="admin",
+            is_superadmin=is_first_admin,
+        )
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-        click.echo(f"Administrador {normalized_username} creado.")
+        if is_first_admin:
+            click.echo(f"Superadministrador {normalized_username} creado.")
+        else:
+            click.echo(f"Administrador {normalized_username} creado.")

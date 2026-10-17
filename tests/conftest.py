@@ -42,7 +42,7 @@ def client(app):
 @pytest.fixture
 def admin_user(app):
     with app.app_context():
-        user = User(username="admin", full_name="Portal Admin", role="admin")
+        user = User(username="admin", full_name="Portal Admin", role="admin", is_superadmin=True)
         user.set_password("a-very-secure-password")
         db.session.add(user)
         db.session.commit()

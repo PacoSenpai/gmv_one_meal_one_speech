@@ -1,11 +1,67 @@
 {% extends "base.html" %}
 {% block title %}Miembros — Administración{% endblock %}
 {% block content %}
-<section class="page-heading compact-heading"><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Panel de administración</a><span class="eyebrow">PERSONAS CON ACCESO</span><h1>El equipo que comparte.</h1><p>Gestiona roles y accesos. Las contraseñas temporales se muestran una sola vez.</p></section>
-<div class="admin-table-wrap"><table class="admin-table member-table"><thead><tr><th>Miembro</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
-  {% for user in users %}<tr><td><div class="member-cell"><span class="mini-avatar">{{ user.display_name[:1]|upper }}</span><span><strong>{{ user.display_name }}</strong><small>@{{ user.username }}{% if user.id == current_user.id %} · Tú{% endif %}</small></span></div></td>
-  <td><form method="post" action="{{ url_for('admin.change_user_role', user_id=user.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><select name="role" aria-label="Rol de {{ user.username }}"><option value="member" {% if user.role == 'member' %}selected{% endif %}>Miembro</option><option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option></select><button type="submit">Guardar</button></form></td>
-  <td><span class="status-pill {% if not user.is_active %}status-cancelled{% endif %}">{{ 'ACTIVO' if user.is_active else 'DESACTIVADO' }}</span></td>
-  <td><div class="table-actions"><form method="post" action="{{ url_for('admin.reset_password', user_id=user.id) }}" data-confirm="Se generará una contraseña temporal y su sesión actual dejará de ser válida."><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Nueva contraseña</button></form><form method="post" action="{{ url_for('admin.toggle_user_status', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="active" value="{{ '0' if user.is_active else '1' }}"><button class="{% if user.is_active %}danger-action{% endif %}" type="submit">{{ 'Desactivar' if user.is_active else 'Reactivar' }}</button></form></div></td></tr>{% endfor %}
-</tbody></table></div>
+<section class="page-heading compact-heading">
+  <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Panel de administración</a>
+  <span class="eyebrow">PERSONAS CON ACCESO</span>
+  <h1>El equipo que comparte.</h1>
+  <p>Los administradores pueden promover miembros. Solo el superadministrador puede gestionar contraseñas o retirar permisos de administrador.</p>
+</section>
+<div class="admin-table-wrap"><table class="admin-table member-table">
+  <thead><tr><th>Miembro</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+  <tbody>
+    {% for user in users %}
+      <tr>
+        <td>
+          <div class="member-cell">
+            <span class="mini-avatar">{{ user.display_name[:1]|upper }}</span>
+            <span><strong>{{ user.display_name }}</strong><small>@{{ user.username }}{% if user.id == current_user.id %} · Tú{% endif %}</small></span>
+          </div>
+        </td>
+        <td>
+          {% if user.is_superadmin %}
+            <span class="role-protection role-superadmin">SUPERADMIN · PROTEGIDO</span>
+          {% elif user.role == 'admin' and not current_user.is_superadmin %}
+            <span class="role-protection">ADMIN · SOLO SUPERADMIN</span>
+          {% else %}
+            <form method="post" action="{{ url_for('admin.change_user_role', user_id=user.id) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <select name="role" aria-label="Rol de {{ user.username }}">
+                <option value="member" {% if user.role == 'member' %}selected{% endif %}>Miembro</option>
+                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+              </select>
+              <button type="submit">Guardar</button>
+            </form>
+          {% endif %}
+        </td>
+        <td><span class="status-pill {% if not user.is_active %}status-cancelled{% endif %}">{{ 'ACTIVO' if user.is_active else 'DESACTIVADO' }}</span></td>
+        <td>
+          <div class="table-actions">
+            {% if current_user.is_superadmin and user.is_active %}
+              <form method="post" action="{{ url_for('admin.reset_password', user_id=user.id) }}" data-confirm="Se generará una contraseña temporal y la sesión de {{ user.display_name }} dejará de ser válida.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Nueva contraseña</button>
+              </form>
+            {% elif not current_user.is_superadmin %}
+              <span class="role-protection">SOLO SUPERADMIN</span>
+            {% endif %}
+
+            {% if user.is_superadmin %}
+              <span class="role-protection">CUENTA PROTEGIDA</span>
+            {% elif user.id == current_user.id %}
+              <span class="role-protection">TU SESIÓN</span>
+            {% elif user.role == 'admin' and not current_user.is_superadmin %}
+              <span class="role-protection">SOLO SUPERADMIN</span>
+            {% else %}
+              <form method="post" action="{{ url_for('admin.toggle_user_status', user_id=user.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="active" value="{{ '0' if user.is_active else '1' }}">
+                <button class="{% if user.is_active %}danger-action{% endif %}" type="submit">{{ 'Desactivar' if user.is_active else 'Reactivar' }}</button>
+              </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table></div>
 {% endblock %}

@@ -60,6 +60,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  const scheduleForm = document.querySelector("[data-schedule-form]");
+  if (scheduleForm) {
+    const scheduleCount = document.querySelector("[data-schedule-count]");
+    const scheduleTime = document.querySelector("[data-schedule-time]");
+    const defaultTimeInput = scheduleForm.querySelector('input[name="default_time"]');
+    const updateScheduleSummary = () => {
+      if (scheduleCount) {
+        const selectedCount = scheduleForm.querySelectorAll('input[name="slot"]:checked').length;
+        scheduleCount.textContent = String(selectedCount);
+      }
+      if (scheduleTime && defaultTimeInput) {
+        scheduleTime.textContent = defaultTimeInput.value || "--:--";
+      }
+    };
+
+    scheduleForm.addEventListener("change", updateScheduleSummary);
+    defaultTimeInput?.addEventListener("input", updateScheduleSummary);
+    updateScheduleSummary();
+  }
+
   document.querySelectorAll("[data-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
       const value = document.getElementById(button.dataset.copy)?.textContent?.trim();

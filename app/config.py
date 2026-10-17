@@ -10,6 +10,7 @@ class Config:
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///portal.sqlite3")
     DATABASE_PATH = os.environ.get("DATABASE_PATH")
+    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_TOKEN_LOCATION = ["cookies"]
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
@@ -26,7 +27,7 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "0") == "1"
     MAX_CONTENT_LENGTH = 42 * 1024 * 1024
     MAX_FORM_MEMORY_SIZE = 128 * 1024
-    MAX_FORM_PARTS = 32
+    MAX_FORM_PARTS = 64
     MAX_IMAGE_SIZE = 8 * 1024 * 1024
     MAX_IMAGES_PER_TALK = 5
     MAX_IMAGE_PIXELS = 25_000_000
