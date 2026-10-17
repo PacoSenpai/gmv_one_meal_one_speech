@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Crear cuenta — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="auth-layout">
+  <div class="auth-aside"><span class="eyebrow eyebrow-light">UNA MESA MÁS GRANDE</span><h1>Tu curiosidad tiene sitio.</h1><p>Las cuentas se crean con invitación. Después, solo hace falta tener algo que te apetezca compartir.</p><span class="auth-aside-index">GMV / OMS — 02</span></div>
+  <div class="auth-card"><span class="eyebrow">REGISTRO CON INVITACIÓN</span><h2>Crear cuenta</h2>
+    {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+    <form method="post" class="form-stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Código de invitación<input name="invitation_code" value="{{ form.get('invitation_code', '') if form else '' }}" autocomplete="off" required></label>
+      <label>Nombre de usuario<input name="username" value="{{ form.get('username', '') if form else '' }}" autocomplete="username" minlength="3" maxlength="30" required><small>Recomendamos usar un acrónimo como nombre de usuario.</small></label>
+      <label>Nombre completo <span class="optional">OPCIONAL</span><input name="full_name" value="{{ form.get('full_name', '') if form else '' }}" autocomplete="name" maxlength="120"></label>
+      <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>Al menos 12 caracteres.</small></label>
+      <button class="button button-dark button-full" type="submit">Crear mi cuenta <span aria-hidden="true">↗</span></button>
+    </form>
+    <p class="auth-switch">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión</a></p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Editar charla — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading compact-heading">
+  <a class="back-link" href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">← Volver a mi charla</a>
+  <span class="eyebrow">EDITAR TU PROPUESTA</span>
+  <h1>Deja la idea a punto.</h1>
+  <p>La fecha programada no cambiará. Puedes modificar el contenido, los recursos y las imágenes.</p>
+</section>
+<section class="proposal-layout">
+  <form method="post" enctype="multipart/form-data" class="proposal-form form-stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+    <label>Título de la exposición<input name="title" value="{{ form.get('title', talk.title) if form else talk.title }}" maxlength="140" required></label>
+    <label>Descripción<textarea name="description" rows="7" minlength="20" maxlength="8000" required>{{ form.get('description', talk.description) if form else talk.description }}</textarea><small>Entre 20 y 8.000 caracteres.</small></label>
+    <label>Recursos <span class="optional">OPCIONAL</span><textarea name="resources" rows="4">{{ form.get('resources', resources_value) if form else resources_value }}</textarea><small>Un enlace http o https por línea. Puedes escribir “Nombre | URL”.</small></label>
+
+    {% if talk.images %}
+      <fieldset class="image-edit-fieldset">
+        <legend>Imágenes actuales <span class="optional">MARCA LAS QUE QUIERAS QUITAR</span></legend>
+        <div class="image-edit-grid">
+          {% for image in talk.images %}
+            <label class="image-edit-card">
+              <img src="{{ url_for('public.uploaded_file', filename=image.filename) }}" alt="{{ image.alt_text }}">
+              <span><input type="checkbox" name="remove_images" value="{{ image.id }}"> Quitar imagen {{ loop.index }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endif %}
+
+    <label class="upload-field">Añadir imágenes <span class="optional">HASTA 5 EN TOTAL</span><input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-file-input><small>JPEG, PNG o WebP. Máximo 8 MB por imagen. Para añadir imágenes si ya hay cinco, marca primero las que quieras quitar.</small><span class="file-list" data-file-list aria-live="polite"></span></label>
+    <button class="button button-dark" type="submit">Guardar cambios <span aria-hidden="true">↗</span></button>
+  </form>
+  <aside class="proposal-aside edit-aside"><span class="eyebrow">TU FECHA SE CONSERVA</span><span class="proposal-aside-number">{{ local_datetime(talk.event_at).strftime('%d/%m') }}</span><h2>{{ local_datetime(talk.event_at).strftime('%H:%M') }} h · Hora de Madrid</h2><p>Para ceder el turno a la siguiente charla, vuelve a la ficha y usa “Atrasar un puesto”.</p><div class="proposal-aside-rule"></div><a class="text-arrow" href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">Volver a la charla ↗</a></aside>
+</section>
+{% endblock %}

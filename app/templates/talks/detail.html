@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ talk.title }} — One Meal, One Speech{% endblock %}
+{% block content %}
+<article class="talk-detail">
+  <header class="talk-detail-heading">
+    <a class="back-link" href="{{ url_for('public.index') }}">← Volver a las charlas</a>
+    <div class="eyebrow detail-meta">{{ local_datetime(talk.event_at).strftime('%d · %m · %Y') }} <span>—</span> {{ local_datetime(talk.event_at).strftime('%H:%M') }} H <span>—</span> {{ talk.speaker.display_name }}</div>
+    <h1>{{ talk.title }}</h1>
+    <p class="detail-lede">{{ talk.description|truncate(240, true, '…') }}</p>
+    {% if can_manage_own_talk %}
+      <div class="owner-talk-actions" aria-label="Acciones de tu charla">
+        <a class="button button-outline" href="{{ url_for('talks.edit_own_talk', talk_id=talk.id) }}">Editar mi charla <span aria-hidden="true">↗</span></a>
+        {% if following_talk %}
+          <form method="post" action="{{ url_for('talks.defer_one_position', talk_id=talk.id) }}" data-confirm="Tu charla intercambiará fecha con «{{ following_talk.title }}». ¿Quieres cederle tu turno?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button button-outline" type="submit">Atrasar un puesto <span aria-hidden="true">↘</span></button>
+          </form>
+          <p>El siguiente turno es de <strong>{{ following_talk.speaker.display_name }}</strong>; intercambiaréis las fechas.</p>
+        {% else %}
+          <span class="owner-action-note">No hay otra charla detrás para intercambiar el turno.</span>
+        {% endif %}
+        <form method="post" action="{{ url_for('talks.delete_own_talk', talk_id=talk.id) }}" data-confirm="¿Eliminar definitivamente esta charla? Todas las charlas posteriores avanzarán un turno para cerrar el hueco.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="button button-danger-outline" type="submit">Eliminar charla</button>
+        </form>
+      </div>
+    {% endif %}
+    {% if current_user and current_user.role == 'admin' and talk.status == 'scheduled' %}<a class="text-arrow admin-edit-link" href="{{ url_for('admin.edit_talk', talk_id=talk.id) }}">Administración: editar detalles y fecha ↗</a>{% endif %}
+  </header>
+
+  {% if talk.images %}
+    <section class="talk-gallery" data-carousel aria-label="Imágenes de {{ talk.title }}">
+      <div class="gallery-stage">
+        {% for image in talk.images %}<figure class="gallery-slide {% if loop.first %}active{% endif %}" data-slide="{{ loop.index0 }}"><img src="{{ url_for('public.uploaded_file', filename=image.filename) }}" alt="{{ image.alt_text }}" {% if not loop.first %}loading="lazy"{% endif %}><figcaption>{{ '%02d'|format(loop.index) }} <span>/ {{ '%02d'|format(talk.images|length) }}</span></figcaption></figure>{% endfor %}
+        {% if talk.images|length > 1 %}<div class="gallery-controls"><button type="button" data-previous aria-label="Imagen anterior">←</button><button type="button" data-next aria-label="Imagen siguiente">→</button></div>{% endif %}
+      </div>
+      {% if talk.images|length > 1 %}<div class="gallery-dots" aria-label="Seleccionar imagen">{% for image in talk.images %}<button type="button" class="{% if loop.first %}active{% endif %}" data-go-to="{{ loop.index0 }}" aria-label="Ver imagen {{ loop.index }}"></button>{% endfor %}</div>{% endif %}
+    </section>
+  {% else %}
+    <div class="detail-no-image"><span>GMV / ONE MEAL, ONE SPEECH</span><b>Una idea<br>en movimiento.</b><i>↗</i></div>
+  {% endif %}
+
+  <div class="detail-body-grid">
+    <section class="detail-main">
+      <div class="eyebrow">LA IDEA</div>
+      <div class="talk-description">{{ talk.description }}</div>
+      {% if talk.resources %}
+        <div class="resource-section"><span class="eyebrow">PARA SEGUIR EXPLORANDO</span><div class="resource-list">{% for resource in talk.resources %}<a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer"><span>{{ '%02d'|format(loop.index) }}</span><strong>{{ resource.label }}</strong><i aria-hidden="true">↗</i></a>{% endfor %}</div></div>
+      {% endif %}
+    </section>
+    <aside class="speaker-card"><span class="eyebrow">QUIÉN NOS CUENTA</span><div class="speaker-avatar">{{ talk.speaker.display_name[:1]|upper }}</div><h2>{{ talk.speaker.display_name }}</h2><span>@{{ talk.speaker.username }}</span><div class="speaker-rule"></div><p>{{ 'Exposición realizada' if talk.status == 'completed' else 'Nos encontramos en la hora de comer.' if talk.status == 'scheduled' else 'Esta charla fue cancelada.' }}</p>
+      <div class="event-facts"><span>FECHA</span><strong>{{ local_datetime(talk.event_at).strftime('%d/%m/%Y · %H:%M') }} H</strong></div>
+      {% if talk.status == 'scheduled' %}<span class="status-pill">PRÓXIMA EXPOSICIÓN</span>{% elif talk.status == 'completed' %}<span class="status-pill status-complete">REALIZADA</span>{% else %}<span class="status-pill status-cancelled">CANCELADA</span>{% endif %}
+    </aside>
+  </div>
+
+  {% if talk.status == 'completed' %}
+    <section class="community-section" id="valoraciones">
+      <div class="community-heading"><div><span class="eyebrow">DESPUÉS DE LA CHARLA</span><h2>¿Qué te llevas?</h2></div><div class="reaction-counts"><span>♥ {{ likes }}</span><span>↘ {{ dislikes }}</span></div></div>
+      {% if evaluation_open %}
+        {% if current_user %}<div class="reaction-panel"><span class="eyebrow">DEJA TU IMPRESIÓN</span><div class="reaction-actions">
+          <form method="post" action="{{ url_for('talks.react', talk_id=talk.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="value" value="like"><button class="reaction-button {% if current_reaction == 'like' %}selected{% endif %}" type="submit" aria-pressed="{{ 'true' if current_reaction == 'like' else 'false' }}">♥ <span>Me ha gustado</span></button></form>
+          <form method="post" action="{{ url_for('talks.react', talk_id=talk.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="value" value="dislike"><button class="reaction-button {% if current_reaction == 'dislike' %}selected{% endif %}" type="submit" aria-pressed="{{ 'true' if current_reaction == 'dislike' else 'false' }}">↘ <span>No era para mí</span></button></form>
+        </div></div>
+        {% else %}<p class="login-nudge"><a href="{{ url_for('auth.login', next=request.path) }}">Inicia sesión</a> para valorar y comentar.</p>{% endif %}
+      {% else %}<p class="closed-note">El periodo de valoraciones se abrirá al terminar la exposición y se cerrará al comenzar la siguiente.</p>{% endif %}
+    </section>
+    <section class="comments-section" id="comentarios">
+      <div class="comments-title"><span class="eyebrow">CONVERSACIÓN</span><h2>Comentarios <span>{{ comments|length }}</span></h2><p>El ponente puede responder una vez a cada comentario.</p></div>
+      {% if evaluation_open and current_user %}
+        <form method="post" action="{{ url_for('talks.add_comment', talk_id=talk.id) }}" class="comment-compose"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="visually-hidden" for="new-comment">Escribe un comentario</label><textarea id="new-comment" name="body" rows="3" minlength="2" maxlength="2000" required placeholder="¿Qué idea te llevas? ¿Qué te gustaría preguntarle al ponente?"></textarea><button class="button button-dark" type="submit">Publicar comentario ↗</button></form>
+      {% endif %}
+      {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+      <div class="comment-list">
+        {% for comment in comments %}
+          <article class="comment"><div class="comment-avatar">{{ comment.author.display_name[:1]|upper }}</div><div class="comment-content"><div class="comment-meta"><strong>{{ comment.author.display_name }}</strong><time>{{ local_datetime(comment.created_at).strftime('%d/%m/%Y · %H:%M') }}</time></div><p>{{ comment.body }}</p>
+            {% for reply in comment.replies %}<div class="comment-reply"><span class="reply-mark">↳</span><div><div class="comment-meta"><strong>{{ reply.author.display_name }} <small>PONENTE</small></strong><time>{{ local_datetime(reply.created_at).strftime('%d/%m/%Y · %H:%M') }}</time></div><p>{{ reply.body }}</p></div></div>{% endfor %}
+            {% if evaluation_open and current_user and current_user.id == talk.speaker_id and not comment.replies %}<form method="post" action="{{ url_for('talks.reply_to_comment', talk_id=talk.id, comment_id=comment.id) }}" class="reply-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="visually-hidden" for="reply-{{ comment.id }}">Responder a {{ comment.author.display_name }}</label><input id="reply-{{ comment.id }}" name="body" minlength="2" maxlength="2000" placeholder="Tu respuesta como ponente…" required><button type="submit">Responder ↗</button></form>{% endif %}
+          </div></article>
+        {% else %}<p class="empty-copy comment-empty">Aún no hay comentarios. Esta conversación empieza contigo.</p>{% endfor %}
+      </div>
+    </section>
+  {% endif %}
+</article>
+{% endblock %}

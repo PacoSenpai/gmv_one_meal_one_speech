@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Agenda — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <span class="eyebrow">ENCUENTROS PROGRAMADOS</span>
+  <h1>La agenda de las ideas.</h1>
+  <p>Un martes al mes, una persona distinta y un tema que no sabías que te interesaba.</p>
+</section>
+<section class="agenda-layout">
+  <div class="calendar-panel">
+    <div class="calendar-heading">
+      <a class="calendar-arrow" href="{{ url_for('public.agenda', year=previous_year, month=previous_month) }}" aria-label="Mes anterior">←</a>
+      <h2>{{ month_name }} <span>{{ year }}</span></h2>
+      <a class="calendar-arrow" href="{{ url_for('public.agenda', year=next_year, month=next_month) }}" aria-label="Mes siguiente">→</a>
+    </div>
+    <div class="calendar-grid calendar-weekdays" aria-hidden="true">
+      {% for day_name in ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'] %}<span>{{ day_name }}</span>{% endfor %}
+    </div>
+    <div class="calendar-grid calendar-days">
+      {% for week in month_rows %}
+        {% for day in week %}
+          <div class="calendar-day {% if day.month != month %}outside-month{% endif %} {% if day == today %}today{% endif %} {% if talks_by_day.get(day.day) and day.month == month %}has-talk{% endif %}">
+            <span>{{ day.day }}</span>
+            {% if day.month == month and talks_by_day.get(day.day) %}
+              {% for talk in talks_by_day[day.day] %}<a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}" class="calendar-event" title="{{ talk.title }}">{{ local_datetime(talk.event_at).strftime('%H:%M') }} · {{ talk.title|truncate(24, true, '…') }}</a>{% endfor %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+    <div class="calendar-legend"><span class="legend-dot"></span> Exposición programada <span class="timezone-note">Hora local: Madrid</span></div>
+  </div>
+  <aside class="agenda-side">
+    <span class="eyebrow">PRÓXIMOS ENCUENTROS</span>
+    {% if talks %}
+      <div class="agenda-list">
+        {% for talk in talks %}
+          <a class="agenda-item" href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">
+            <span class="agenda-date"><b>{{ local_datetime(talk.event_at).strftime('%d') }}</b><small>{{ local_datetime(talk.event_at).strftime('%m · %H:%M') }}</small></span>
+            <span class="agenda-info"><strong>{{ talk.title }}</strong><small>{{ talk.speaker.display_name }}</small></span>
+            <span class="agenda-arrow" aria-hidden="true">↗</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}<p class="empty-copy">Aún no hay charlas programadas este mes.</p>{% endif %}
+    {% if current_user %}<a class="button button-dark button-full" href="{{ url_for('talks.propose') }}">+ Proponer una charla</a>{% else %}<a class="text-arrow" href="{{ url_for('auth.login') }}">Entra para proponer una charla ↗</a>{% endif %}
+  </aside>
+</section>
+{% endblock %}

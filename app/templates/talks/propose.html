@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Proponer charla — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading compact-heading"><span class="eyebrow">TU TURNO DE COMPARTIR</span><h1>¿Qué te gustaría contar?</h1><p>No hace falta ser experto: basta con tener curiosidad y ganas de conversar.</p></section>
+<section class="proposal-layout">
+  <form method="post" enctype="multipart/form-data" class="proposal-form form-stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+    <label>Título de la exposición<input name="title" value="{{ form.get('title', '') if form else '' }}" maxlength="140" required placeholder="Una idea que merece una pausa"></label>
+    <label>Descripción<textarea name="description" rows="7" minlength="20" maxlength="8000" required placeholder="¿De qué va? ¿Qué te gustaría que se llevara la gente?">{{ form.get('description', '') if form else '' }}</textarea><small>Entre 20 y 8.000 caracteres. Se mostrará en la página de la charla.</small></label>
+    <label>Recursos <span class="optional">OPCIONAL</span><textarea name="resources" rows="4" placeholder="Artículo | https://ejemplo.com/articulo&#10;https://ejemplo.com/recurso">{{ form.get('resources', '') if form else '' }}</textarea><small>Un enlace por línea. Puedes escribir “Nombre | URL”.</small></label>
+    <label class="upload-field">Imágenes <span class="optional">OPCIONAL · MÁXIMO 5</span><input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-file-input><small>JPEG, PNG o WebP. Máximo 8 MB por imagen. Las imágenes se optimizan al subirlas.</small><span class="file-list" data-file-list aria-live="polite"></span></label>
+    <button class="button button-dark" type="submit">Enviar propuesta <span aria-hidden="true">↗</span></button>
+  </form>
+  <aside class="proposal-aside"><span class="proposal-aside-number">13:30</span><span class="eyebrow">PRÓXIMA FECHA LIBRE</span><h2>Una vez al mes, a la hora de comer.</h2><p>Tu charla se publicará en la cola y se asignará al siguiente primer martes del mes que esté disponible. El administrador puede ajustar la fecha si hace falta.</p><div class="proposal-aside-rule"></div><p class="small-note">Duración y formato, como prefieras. PowerPoint, demo, pizarra o simplemente una buena conversación.</p></aside>
+</section>
+{% endblock %}

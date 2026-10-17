@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Charlas — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <span class="eyebrow">EL ARCHIVO DE IDEAS</span>
+  <h1>{{ heading }}.</h1>
+  <p>{{ intro }}</p>
+</section>
+<nav class="archive-tabs" aria-label="Filtrar charlas">
+  <a class="{% if category == 'proximas' %}active{% endif %}" href="{{ url_for('public.talk_archive', tipo='proximas') }}">Próximas <span>{{ scheduled_count }}</span></a>
+  <a class="{% if category == 'realizadas' %}active{% endif %}" href="{{ url_for('public.talk_archive', tipo='realizadas') }}">Realizadas <span>{{ completed_count }}</span></a>
+  <a class="archive-agenda-link" href="{{ url_for('public.agenda') }}">Ver calendario ↗</a>
+</nav>
+{% if pagination.items %}
+  <section class="talk-grid archive-grid" aria-label="{{ heading }}">
+    {% for talk in pagination.items %}{% include "public/_talk_card.html" %}{% endfor %}
+  </section>
+  {% if pagination.pages > 1 %}
+    <nav class="pagination" aria-label="Paginación">
+      {% if pagination.has_prev %}<a href="{{ url_for('public.talk_archive', tipo=category, page=pagination.prev_num) }}" aria-label="Página anterior">← Anterior</a>{% else %}<span class="disabled">← Anterior</span>{% endif %}
+      <div>{% for page in pagination.iter_pages(left_edge=1, left_current=1, right_current=2, right_edge=1) %}{% if page %}<a class="{% if page == pagination.page %}active{% endif %}" href="{{ url_for('public.talk_archive', tipo=category, page=page) }}">{{ page }}</a>{% else %}<span>…</span>{% endif %}{% endfor %}</div>
+      {% if pagination.has_next %}<a href="{{ url_for('public.talk_archive', tipo=category, page=pagination.next_num) }}" aria-label="Página siguiente">Siguiente →</a>{% else %}<span class="disabled">Siguiente →</span>{% endif %}
+    </nav>
+  {% endif %}
+{% else %}
+  <section class="empty-state archive-empty"><span class="empty-mark">OMS / {{ '01' if category == 'proximas' else '02' }}</span><h3>{{ 'La próxima idea todavía no tiene fecha.' if category == 'proximas' else 'El archivo empieza con la primera charla.' }}</h3><p>{{ 'Propón una exposición y aparecerá aquí en cuanto se envíe.' if category == 'proximas' else 'Cuando se complete una exposición, quedará disponible para volver a ella.' }}</p>
+    {% if category == 'proximas' and current_user %}<a class="button button-dark" href="{{ url_for('talks.propose') }}">Proponer una charla ↗</a>{% elif category == 'proximas' %}<a class="button button-dark" href="{{ url_for('auth.login') }}">Entrar para proponer ↗</a>{% endif %}
+  </section>
+{% endif %}
+{% endblock %}

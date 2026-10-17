@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading stats-heading">
+  <span class="eyebrow">EL CONOCIMIENTO SE COMPARTE</span>
+  <h1>Las ideas dejan huella.</h1>
+  <p>Un pequeño registro de todo lo que hemos aprendido juntos.</p>
+</section>
+<section class="stat-numbers">
+  <article><span>01</span><strong>{{ total_talks }}</strong><small>CHARLAS REALIZADAS</small></article>
+  <article><span>02</span><strong>{{ total_members }}</strong><small>VOCES EN EL EQUIPO</small></article>
+  <article class="stat-note"><span>03 / APRENDER</span><p>Lo que una persona comparte se convierte en una conversación de todos.</p></article>
+</section>
+<section class="rankings-grid">
+  <article class="ranking-panel">
+    <div class="ranking-heading"><span class="eyebrow">01 — QUIÉN HA COMPARTIDO MÁS</span><span class="ranking-icon">↗</span></div>
+    <h2>Voces generosas.</h2>
+    {% if speaker_ranking %}
+      <ol class="speaker-ranking">
+        {% for item in speaker_ranking %}
+          <li><span class="rank-number">{{ '%02d'|format(loop.index) }}</span><span class="rank-name">{{ item.speaker.display_name }}</span><span class="rank-score">{{ item.count }} <small>{{ 'CHARLA' if item.count == 1 else 'CHARLAS' }}</small></span></li>
+        {% endfor %}
+      </ol>
+    {% else %}<p class="empty-copy">Las primeras charlas aún están por llegar.</p>{% endif %}
+  </article>
+  <article class="ranking-panel ranking-popular">
+    <div class="ranking-heading"><span class="eyebrow">02 — LAS MÁS QUERIDAS</span><span class="ranking-icon">♥</span></div>
+    <h2>Ideas que resuenan.</h2>
+    {% if popular_talks %}
+      <ol class="popular-ranking">
+        {% for item in popular_talks %}
+          <li><span class="rank-number">{{ '%02d'|format(loop.index) }}</span><a href="{{ url_for('public.talk_detail', talk_id=item.talk.id) }}">{{ item.talk.title }}<small>{{ item.talk.speaker.display_name }}</small></a><span class="popular-count">♥ {{ item.likes }}</span></li>
+        {% endfor %}
+      </ol>
+    {% else %}<p class="empty-copy">Las valoraciones aparecerán cuando se complete la primera charla.</p>{% endif %}
+  </article>
+</section>
+{% endblock %}

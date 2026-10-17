@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="page-heading compact-heading"><span class="eyebrow">TU PERFIL</span><h1>Tu cuenta, a tu manera.</h1><p>Actualiza cómo apareces en las charlas.</p></section>
+<section class="settings-layout">
+  <div class="settings-card"><span class="eyebrow">DATOS DE MIEMBRO</span><h2>Perfil público</h2>
+    {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+    <form method="post" class="form-stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Nombre de usuario<input name="username" value="{{ form.get('username', current_user.username) if form else current_user.username }}" required maxlength="30"></label>
+      <label>Nombre completo <span class="optional">OPCIONAL</span><input name="full_name" value="{{ form.get('full_name', current_user.full_name or '') if form else current_user.full_name or '' }}" maxlength="120"></label>
+      <button class="button button-dark" type="submit">Guardar perfil</button>
+    </form>
+    <div class="settings-divider"></div>
+    <span class="eyebrow">ACCESO</span><h3>Contraseña</h3><p>Usa una contraseña larga que no compartas con otros servicios.</p>
+    <a class="button button-outline" href="{{ url_for('auth.change_password') }}">Cambiar contraseña <span aria-hidden="true">↗</span></a>
+  </div>
+  <aside class="profile-note"><span class="profile-initial">{{ current_user.display_name[:1]|upper }}</span><span class="eyebrow">ASÍ TE VE EL EQUIPO</span><strong>{{ current_user.display_name }}</strong><small>@{{ current_user.username }} · {{ 'Administración' if current_user.role == 'admin' else 'Miembro' }}</small><p>El nombre completo es opcional; si no lo añades, se mostrará tu nombre de usuario.</p></aside>
+</section>
+{% endblock %}

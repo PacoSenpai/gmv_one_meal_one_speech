@@ -1,0 +1,16 @@
+<article class="talk-card">
+  <a class="talk-card-image" href="{{ url_for('public.talk_detail', talk_id=talk.id) }}" aria-label="Ver {{ talk.title }}">
+    {% if talk.images %}
+      <img src="{{ url_for('public.uploaded_file', filename=talk.images[0].filename) }}" alt="{{ talk.images[0].alt_text }}" loading="lazy">
+    {% else %}
+      <div class="image-placeholder"><span>GMV / IDEAS</span><b>{{ '%02d'|format(talk.id) }}</b></div>
+    {% endif %}
+    <span class="image-index">CHARLA {{ '%02d'|format(talk.id) }}</span>
+  </a>
+  <div class="talk-card-content">
+    <div class="eyebrow">{{ local_datetime(talk.event_at).strftime('%d · %m · %Y') }} <span>—</span> {{ talk.speaker.display_name }}</div>
+    <h3><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">{{ talk.title }}</a></h3>
+    <p>{{ talk.description|truncate(180, true, '…') }}</p>
+    <a class="text-arrow" href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">Descubrir la charla <span aria-hidden="true">↗</span></a>
+  </div>
+</article>

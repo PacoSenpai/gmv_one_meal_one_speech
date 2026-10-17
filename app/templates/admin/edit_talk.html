@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Editar charla — Administración{% endblock %}
+{% block content %}
+<section class="page-heading compact-heading"><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Panel de administración</a><span class="eyebrow">GESTIÓN DE AGENDA</span><h1>Ajustar los detalles.</h1><p>El cambio de fecha actualizará el calendario y la cuenta atrás.</p></section>
+<form method="post" class="proposal-form form-stack edit-talk-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+  <label>Título<input name="title" value="{{ form.get('title', talk.title) if form else talk.title }}" maxlength="140" required></label>
+  <label>Descripción<textarea name="description" rows="7" minlength="20" maxlength="8000" required>{{ form.get('description', talk.description) if form else talk.description }}</textarea></label>
+  <div class="date-time-row"><label>Fecha<input type="date" name="event_date" value="{{ form.get('event_date', event_local.strftime('%Y-%m-%d')) if form else event_local.strftime('%Y-%m-%d') }}" required></label><label>Hora de Madrid<input type="time" name="event_time" value="{{ form.get('event_time', event_local.strftime('%H:%M')) if form else event_local.strftime('%H:%M') }}" required></label></div>
+  <button class="button button-dark" type="submit">Guardar cambios ↗</button>
+</form>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}One Meal, One Speech — Charlas GMV{% endblock %}
+{% block content %}
+<section class="hero-grid">
+  <div class="hero-copy">
+    <div class="eyebrow eyebrow-light"><span class="live-dot"></span> UNA CHARLA. MUCHAS IDEAS.</div>
+    {% if next_talk %}
+      <p class="hero-kicker">La próxima conversación</p>
+      <h1>{{ next_talk.title }}</h1>
+      <p class="hero-description">{{ next_talk.description|truncate(210, true, '…') }}</p>
+      <div class="hero-meta">
+        <span>CON {{ next_talk.speaker.display_name }}</span>
+        <span>{{ local_datetime(next_talk.event_at).strftime('%d · %m · %Y') }} — {{ local_datetime(next_talk.event_at).strftime('%H:%M') }} H</span>
+      </div>
+      <a class="button button-light" href="{{ url_for('public.talk_detail', talk_id=next_talk.id) }}">Conoce la charla <span aria-hidden="true">↗</span></a>
+    {% else %}
+      <p class="hero-kicker">Una pausa para pensar en voz alta</p>
+      <h1>Las mejores ideas caben en una comida.</h1>
+      <p class="hero-description">Un espacio abierto para aprender de lo que saben y les interesa las personas que tenemos al lado.</p>
+      {% if current_user %}<a class="button button-light" href="{{ url_for('talks.propose') }}">Propón la próxima charla <span aria-hidden="true">↗</span></a>
+      {% else %}<a class="button button-light" href="{{ url_for('auth.register') }}">Únete a la conversación <span aria-hidden="true">↗</span></a>{% endif %}
+    {% endif %}
+    <div class="hero-orbit" aria-hidden="true"><span></span><i></i><b></b></div>
+  </div>
+  <aside class="countdown-panel" aria-label="Cuenta atrás para la siguiente exposición">
+    <div class="countdown-top"><span class="eyebrow">SIGUIENTE EXPO</span><span class="countdown-spark" aria-hidden="true">✳</span></div>
+    {% if next_talk %}
+      <p class="countdown-title">{{ next_talk.title }}</p>
+      <div class="countdown" data-countdown="{{ local_datetime(next_talk.event_at).isoformat() }}">
+        <div><strong data-unit="months">—</strong><span>MESES</span></div>
+        <div><strong data-unit="days">—</strong><span>DÍAS</span></div>
+        <div><strong data-unit="hours">—</strong><span>HORAS</span></div>
+        <div><strong data-unit="minutes">—</strong><span>MIN</span></div>
+        <div><strong data-unit="seconds">—</strong><span>SEG</span></div>
+      </div>
+      <div class="countdown-footer"><span class="countdown-line"></span><span>HORA DE MADRID</span></div>
+    {% else %}
+      <div class="empty-countdown"><strong>Tu idea puede ser la siguiente.</strong><span>La cola está esperando nuevas voces.</span></div>
+      <div class="countdown-footer"><span class="countdown-line"></span><span>13:30 · EUROPE/MADRID</span></div>
+    {% endif %}
+  </aside>
+</section>
+
+<section class="intro-strip">
+  <p>Una vez al mes, compartimos conocimiento sin presentaciones perfectas ni grandes escenarios. Solo personas, curiosidad y una buena conversación.</p>
+  <a href="{{ url_for('public.agenda') }}">Ver calendario <span aria-hidden="true">↗</span></a>
+</section>
+
+<section class="section-heading">
+  <div><span class="eyebrow">LO QUE VIENE</span><h2>Ideas con fecha.</h2></div>
+  <a class="text-arrow" href="{{ url_for('public.talk_archive') }}">Ver todas las charlas <span aria-hidden="true">↗</span></a>
+</section>
+{% if talks %}
+  <section class="talk-grid" aria-label="Próximas exposiciones">
+    {% for talk in talks %}{% include "public/_talk_card.html" %}{% endfor %}
+  </section>
+{% else %}
+  <section class="empty-state">
+    <span class="empty-mark">01 / ?</span><h3>El siguiente tema puede ser tuyo.</h3>
+    <p>Presenta algo que te apasione: un proyecto, una pregunta o una idea que merezca una pausa.</p>
+    {% if current_user %}<a class="button button-dark" href="{{ url_for('talks.propose') }}">Proponer una charla</a>{% else %}<a class="button button-dark" href="{{ url_for('auth.login') }}">Entrar para proponer</a>{% endif %}
+  </section>
+{% endif %}
+
+{% if recent_talks %}
+  <section class="section-heading recent-heading">
+    <div><span class="eyebrow">IDEAS YA COMPARTIDAS</span><h2>La conversación continúa.</h2></div>
+    <a class="text-arrow recent-caption" href="{{ url_for('public.talk_archive', tipo='realizadas') }}">Ver el archivo ↗</a>
+  </section>
+  <section class="talk-grid" aria-label="Exposiciones recientes">
+    {% for talk in recent_talks %}{% include "public/_talk_card.html" %}{% endfor %}
+  </section>
+{% endif %}
+
+<section class="manifesto-band">
+  <span class="manifesto-number">01—12</span>
+  <p>Doce meses.<br><em>Un montón de mundos por descubrir.</em></p>
+  <span class="manifesto-stamp">ONE<br>MEAL<br>ONE<br>SPEECH</span>
+</section>
+{% endblock %}

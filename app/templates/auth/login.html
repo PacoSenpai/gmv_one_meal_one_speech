@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Entrar — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="auth-layout">
+  <div class="auth-aside"><span class="eyebrow eyebrow-light">QUÉ BUENO VERTE</span><h1>La conversación sigue.</h1><p>Vuelve a las ideas que compartimos y encuentra tu próxima charla.</p><span class="auth-aside-index">GMV / OMS — 01</span></div>
+  <div class="auth-card"><span class="eyebrow">ACCESO DE MIEMBROS</span><h2>Iniciar sesión</h2>
+    {% if errors %}<div class="form-errors" role="alert">{% for field, messages in errors.items() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endfor %}</div>{% endif %}
+    <form method="post" class="form-stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <label>Nombre de usuario<input name="username" autocomplete="username" required autofocus></label>
+      <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="button button-dark button-full" type="submit">Entrar <span aria-hidden="true">↗</span></button>
+    </form>
+    <p class="auth-switch">¿Tienes código de invitación? <a href="{{ url_for('auth.register') }}">Crear una cuenta</a></p>
+  </div>
+</section>
+{% endblock %}

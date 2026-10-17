@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Mis charlas — One Meal, One Speech{% endblock %}
+{% block content %}
+<section class="admin-heading my-talks-heading">
+  <div><span class="eyebrow">TU RECORRIDO · GMV / OMS</span><h1>Mis charlas.</h1><p>Propuestas, turnos programados y conversaciones que ya compartiste.</p></div>
+  <a class="button button-dark" href="{{ url_for('talks.propose') }}">+ Proponer charla</a>
+</section>
+
+<section class="my-talks-section">
+  <div class="admin-section-heading"><div><span class="eyebrow">EN LA AGENDA</span><h2>Próximas</h2></div><span class="my-talk-count">{{ scheduled_talks|length }} PROGRAMADAS</span></div>
+  {% if scheduled_talks %}
+    <div class="my-talk-list">
+      {% for talk in scheduled_talks %}
+        <article class="my-talk-card">
+          <div class="my-talk-date"><strong>{{ local_datetime(talk.event_at).strftime('%d') }}</strong><span>{{ local_datetime(talk.event_at).strftime('%m · %H:%M') }}</span></div>
+          <div class="my-talk-main"><span class="eyebrow">{{ local_datetime(talk.event_at).strftime('%d · %m · %Y') }}</span><h3><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">{{ talk.title }}</a></h3><p>{{ talk.description|truncate(150, true, '…') }}</p></div>
+          <div class="my-talk-actions"><span class="status-pill">{{ 'PROGRAMADA' if talk.event_at > now else 'PENDIENTE DE MARCAR COMO REALIZADA' }}</span><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">Ver charla ↗</a>{% if talk.event_at > now %}<a href="{{ url_for('talks.edit_own_talk', talk_id=talk.id) }}">Editar</a><form method="post" action="{{ url_for('talks.delete_own_talk', talk_id=talk.id) }}" data-confirm="¿Eliminar definitivamente esta charla? Todas las charlas posteriores avanzarán un turno para cerrar el hueco."><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="danger-text-button" type="submit">Eliminar</button></form>{% endif %}</div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="my-talk-empty"><span class="empty-mark">01 / TU TURNO</span><p>Aún no tienes charlas programadas. Tu siguiente idea puede empezar aquí.</p><a class="text-arrow" href="{{ url_for('talks.propose') }}">Proponer una charla ↗</a></div>
+  {% endif %}
+</section>
+
+<section class="my-talks-section archive-owned-section">
+  <div class="admin-section-heading"><div><span class="eyebrow">IDEAS COMPARTIDAS</span><h2>Realizadas</h2></div><span class="my-talk-count">{{ completed_talks|length }} REALIZADAS</span></div>
+  {% if completed_talks %}<div class="my-talk-list">
+    {% for talk in completed_talks %}<article class="my-talk-card completed-my-talk"><div class="my-talk-date"><strong>{{ local_datetime(talk.event_at).strftime('%d') }}</strong><span>{{ local_datetime(talk.event_at).strftime('%m · %Y') }}</span></div><div class="my-talk-main"><span class="eyebrow">{{ local_datetime(talk.event_at).strftime('%d · %m · %Y') }}</span><h3><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">{{ talk.title }}</a></h3><p>{{ talk.description|truncate(150, true, '…') }}</p></div><div class="my-talk-actions"><span class="status-pill status-complete">REALIZADA</span><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">Ver charla y conversación ↗</a></div></article>{% endfor %}
+  </div>{% else %}<p class="empty-copy my-talk-muted">Cuando completes tu primera exposición, quedará aquí.</p>{% endif %}
+</section>
+
+{% if cancelled_talks %}
+  <details class="cancelled-talks"><summary>Charlas canceladas <span>{{ cancelled_talks|length }}</span></summary><div class="my-talk-list">
+    {% for talk in cancelled_talks %}<article class="my-talk-card"><div class="my-talk-date"><strong>{{ local_datetime(talk.event_at).strftime('%d') }}</strong><span>{{ local_datetime(talk.event_at).strftime('%m · %Y') }}</span></div><div class="my-talk-main"><h3><a href="{{ url_for('public.talk_detail', talk_id=talk.id) }}">{{ talk.title }}</a></h3></div><div class="my-talk-actions"><span class="status-pill status-cancelled">CANCELADA</span></div></article>{% endfor %}
+  </div></details>
+{% endif %}
+{% endblock %}

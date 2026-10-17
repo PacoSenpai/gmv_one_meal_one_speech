@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#130817">
+  <meta name="description" content="GMV One Meal, One Speech: ideas técnicas compartidas entre compañeros.">
+  <title>{% block title %}GMV One Meal, One Speech{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Saltar al contenido</a>
+  <header class="site-header">
+    <div class="topline"><span>UN ESPACIO PARA COMPARTIR LO QUE NOS MUEVE</span><span class="topline-mark">CONOCIMIENTO · CURIOSIDAD · EQUIPO</span></div>
+    <div class="nav-wrap">
+      <a class="brand" href="{{ url_for('public.index') }}" aria-label="GMV One Meal, One Speech — inicio">
+        <img src="{{ url_for('static', filename='img/gmv-logo.svg') }}" alt="GMV Innovating Solutions">
+        <span class="brand-divider"></span><span class="brand-title">ONE MEAL<br><strong>ONE SPEECH</strong></span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="main-navigation">Menú</button>
+      <nav id="main-navigation" class="main-nav" aria-label="Navegación principal">
+        <a href="{{ url_for('public.talk_archive') }}">Charlas</a>
+        <a href="{{ url_for('public.agenda') }}">Agenda</a>
+        <a href="{{ url_for('public.statistics') }}">Estadísticas</a>
+        {% if current_user %}
+          <a href="{{ url_for('talks.my_talks') }}">Mis charlas</a>
+          <a href="{{ url_for('talks.propose') }}" class="nav-cta">Proponer charla <span aria-hidden="true">↗</span></a>
+          {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.dashboard') }}">Administración</a>{% endif %}
+          <div class="nav-account">
+            <a href="{{ url_for('auth.account') }}" class="account-link">{{ current_user.display_name }}</a>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="link-button" type="submit">Salir</button>
+            </form>
+          </div>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}">Entrar</a>
+          <a href="{{ url_for('auth.register') }}" class="nav-cta">Crear cuenta <span aria-hidden="true">↗</span></a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="flash-stack" role="status">
+      {% for category, message in messages %}<p class="flash flash-{{ category }}">{{ message }}</p>{% endfor %}
+    </div>{% endif %}
+  {% endwith %}
+
+  <main id="main-content" class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <a class="footer-brand" href="{{ url_for('public.index') }}">GMV <span>ONE MEAL, ONE SPEECH</span></a>
+      <p>Una conversación a la vez. Hecho para compartir ideas.</p>
+      <span class="footer-note">Portal de charlas · Identidad GMV</span>
+    </div>
+  </footer>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
