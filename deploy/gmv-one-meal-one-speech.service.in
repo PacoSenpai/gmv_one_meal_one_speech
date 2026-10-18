@@ -17,7 +17,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/var/lib/gmv-one-meal-one-speech
+ReadWritePaths=@APP_DIR@/instance
 
 [Install]
 WantedBy=multi-user.target

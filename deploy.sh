@@ -3,7 +3,8 @@ set -euo pipefail
 
 SERVICE_NAME="gmv-one-meal-one-speech.service"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
-APP_DIR="$(git rev-parse --show-toplevel)"
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+APP_DIR="$(git -C "$(dirname "${SCRIPT_PATH}")" rev-parse --show-toplevel)"
 
 if [[ "${EUID}" -ne 0 ]]; then
   if ! command -v sudo >/dev/null 2>&1; then
@@ -27,6 +28,10 @@ if [[ -z "${APP_USER}" ]] || ! id "${APP_USER}" >/dev/null 2>&1; then
   echo "Error: ejecuta el script con sudo desde la cuenta que ejecutará la aplicación." >&2
   exit 1
 fi
+if [[ "${APP_USER}" == "root" ]]; then
+  echo "Error: la aplicación no debe ejecutarse como root; usa una cuenta propietaria del checkout." >&2
+  exit 1
+fi
 if ! command -v systemctl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
   echo "Error: este despliegue requiere systemd y Python 3." >&2
   exit 1
@@ -37,10 +42,44 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 APP_GROUP="$(id -gn "${APP_USER}")"
-STATE_DIR="/var/lib/gmv-one-meal-one-speech"
+INSTANCE_DIR="${APP_DIR}/instance"
+DATABASE_PATH="${INSTANCE_DIR}/portal.sqlite3"
+UPLOAD_FOLDER="${INSTANCE_DIR}/uploads"
 ENV_FILE="/etc/default/gmv-one-meal-one-speech"
 umask 027
-install -d -o "${APP_USER}" -g "${APP_GROUP}" -m 0750 "${STATE_DIR}" "${STATE_DIR}/uploads"
+install -d -o "${APP_USER}" -g "${APP_GROUP}" -m 0750 "${INSTANCE_DIR}" "${UPLOAD_FOLDER}"
+if ! sudo -u "${APP_USER}" test -x "${APP_DIR}" \
+  || ! sudo -u "${APP_USER}" test -w "${INSTANCE_DIR}"; then
+  echo "Error: ${APP_USER} necesita acceso al checkout y escritura en ${INSTANCE_DIR}." >&2
+  exit 1
+fi
+
+if [[ -f "${ENV_FILE}" ]]; then
+  python3 - "${ENV_FILE}" "${DATABASE_PATH}" "${UPLOAD_FOLDER}" <<'PY'
+from pathlib import Path
+import sys
+
+environment_file = Path(sys.argv[1])
+expected = {
+    "DATABASE_URL": "sqlite:///portal.sqlite3",
+    "DATABASE_PATH": sys.argv[2],
+    "UPLOAD_FOLDER": sys.argv[3],
+}
+configured = {}
+for line in environment_file.read_text(encoding="utf-8").splitlines():
+    key, separator, value = line.partition("=")
+    if separator:
+        configured[key.strip()] = value.strip()
+for key, value in expected.items():
+    if configured.get(key) != value:
+        print(
+            f"Error: {environment_file} ya existe y {key} no apunta al checkout actual. "
+            "No se ha cambiado la configuración ni la base de datos.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+PY
+fi
 
 if [[ ! -d "${APP_DIR}/.venv" ]]; then
   sudo -u "${APP_USER}" python3 -m venv "${APP_DIR}/.venv"
@@ -54,9 +93,9 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   cat >"${ENV_FILE}" <<EOF
 SECRET_KEY=${SECRET_KEY}
 JWT_SECRET_KEY=${JWT_SECRET_KEY}
-DATABASE_URL=sqlite:////var/lib/gmv-one-meal-one-speech/portal.sqlite3
-DATABASE_PATH=/var/lib/gmv-one-meal-one-speech/portal.sqlite3
-UPLOAD_FOLDER=/var/lib/gmv-one-meal-one-speech/uploads
+DATABASE_URL=sqlite:///portal.sqlite3
+DATABASE_PATH=${DATABASE_PATH}
+UPLOAD_FOLDER=${UPLOAD_FOLDER}
 COOKIE_SECURE=1
 APP_ENV=production
 RATELIMIT_STORAGE_URI=redis://127.0.0.1:6379/0
@@ -65,6 +104,13 @@ EOF
   chown root:"${APP_GROUP}" "${ENV_FILE}"
   chmod 0640 "${ENV_FILE}"
 fi
+
+for state_file in "${DATABASE_PATH}" "${DATABASE_PATH}-wal" "${DATABASE_PATH}-shm"; do
+  if [[ -e "${state_file}" ]]; then
+    chown "${APP_USER}:${APP_GROUP}" "${state_file}"
+  fi
+done
+chown -R "${APP_USER}:${APP_GROUP}" "${UPLOAD_FOLDER}"
 
 sudo -u "${APP_USER}" bash -c '
   set -a

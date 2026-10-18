@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="$(git rev-parse --show-toplevel)"
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+APP_DIR="$(git -C "$(dirname "${SCRIPT_PATH}")" rev-parse --show-toplevel)"
 SERVICE_NAME="gmv-one-meal-one-speech.service"
 ENV_FILE="/etc/default/gmv-one-meal-one-speech"
 
@@ -27,6 +28,24 @@ if ! sudo systemctl is-active --quiet "${SERVICE_NAME}"; then
   echo "Error: el servicio ${SERVICE_NAME} no está activo." >&2
   exit 1
 fi
+
+EXPECTED_DB_PATH="${APP_DIR}/instance/portal.sqlite3"
+EXPECTED_UPLOAD_FOLDER="${APP_DIR}/instance/uploads"
+if [[ "${DATABASE_URL:-}" != "sqlite:///portal.sqlite3" \
+  || "${DATABASE_PATH:-}" != "${EXPECTED_DB_PATH}" \
+  || "${UPLOAD_FOLDER:-}" != "${EXPECTED_UPLOAD_FOLDER}" ]]; then
+  echo "Error: la configuración del servicio no apunta a instance/ del checkout actual." >&2
+  echo "Vuelve a configurar el despliegue antes de actualizar; no se ha modificado nada." >&2
+  exit 1
+fi
+
+SERVICE_WORKING_DIR="$(sudo systemctl show "${SERVICE_NAME}" --property=WorkingDirectory --value)"
+if [[ "$(realpath -m "${SERVICE_WORKING_DIR}")" != "$(realpath -m "${APP_DIR}")" ]]; then
+  echo "Error: systemd usa ${SERVICE_WORKING_DIR}, no el checkout ${APP_DIR}." >&2
+  echo "Ejecuta update.sh desde el checkout configurado en el servicio." >&2
+  exit 1
+fi
+
 RATE_LIMIT_STORAGE_URI="${RATELIMIT_STORAGE_URI:-redis://127.0.0.1:6379/0}"
 if [[ "${RATE_LIMIT_STORAGE_URI}" == redis://127.0.0.1:6379/* ]] \
   && ! sudo systemctl is-active --quiet redis-server.service; then

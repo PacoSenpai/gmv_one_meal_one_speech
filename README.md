@@ -52,9 +52,11 @@ La suite contiene pruebas unitarias de programación, pruebas de integración co
 
 ## Despliegue y actualización
 
-`deploy.sh` crea el entorno virtual, configura la base de datos y las imágenes en `/var/lib/gmv-one-meal-one-speech`, instala el servicio systemd y comprueba `/api/health`. Debe ejecutarse con `sudo` desde la cuenta que será propietaria del proceso. Si el servicio ya existe, el script informa y no modifica nada. El despliegue incluido usa Redis local: instala y activa `redis-server` antes de ejecutarlo (`sudo apt install redis-server && sudo systemctl enable --now redis-server`).
+`deploy.sh` detecta el checkout a partir de la ubicación del propio script y guarda la base SQLite y las imágenes en `<checkout>/instance/`. La unidad systemd usa ese mismo checkout como `WorkingDirectory` y solo permite escribir en su `instance/`. Ejecuta el despliegue con `sudo` desde una cuenta no-root que sea propietaria del checkout y vaya a ejecutar el proceso; no instales el repositorio bajo `/root`. Si el servicio ya existe, el script no lo reconfigura. El despliegue incluido usa Redis local: instala y activa `redis-server` antes de ejecutarlo (`sudo apt install redis-server && sudo systemctl enable --now redis-server`).
 
-En producción, `deploy.sh` crea y protege `/etc/default/gmv-one-meal-one-speech` con claves aleatorias y la configuración del servicio; no usa el `.env` local.
+En producción, `deploy.sh` crea y protege `/etc/default/gmv-one-meal-one-speech` con claves aleatorias y la configuración del servicio; no usa el `.env` local. La base activa es `<checkout>/instance/portal.sqlite3`; las copias de seguridad de `update.sh` quedan en `<checkout>/instance/backups/`. Si el archivo de entorno ya existe y apunta a otra ubicación, el despliegue se detiene para evitar cambiar de base de datos accidentalmente.
+
+Para retirar intencionadamente la instalación anterior y crear una nueva desde cero, ejecuta `sudo ./recreate_deployment.sh --apply` desde el checkout definitivo, bajo la cuenta no-root que ejecutará el servicio. El script exige confirmar la ruta completa y borra la unidad, el entorno de producción, las bases y archivos de instancia conocidos y los entornos virtuales anterior y nuevo; conserva el código. Genera claves nuevas y una base vacía. No lo uses para una actualización normal.
 
 Después de instalarlo, crea el administrador inicial con el mismo usuario del proceso, cargando la configuración de entorno que instaló el despliegue:
 
