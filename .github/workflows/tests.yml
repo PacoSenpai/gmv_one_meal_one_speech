@@ -1,4 +1,4 @@
-name: Tests
+name: Tests and deployment smoke test
 
 on:
   push:
@@ -28,3 +28,66 @@ jobs:
         run: pytest -q
       - name: Check Python style
         run: ruff check app tests wsgi.py
+
+  deployment-smoke-test:
+    needs: test
+    runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: production
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      JWT_SECRET_KEY: ci-only-jwt-secret-key-not-for-production-9876543210
+      DATABASE_URL: sqlite:///portal.sqlite3
+      DATABASE_PATH: ${{ github.workspace }}/instance/portal.sqlite3
+      UPLOAD_FOLDER: ${{ github.workspace }}/instance/uploads
+      COOKIE_SECURE: "1"
+      RATELIMIT_STORAGE_URI: redis://127.0.0.1:6379/0
+      TRUSTED_PROXY_COUNT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Prepare production-like storage
+        run: mkdir -p instance/uploads
+      - name: Apply production database migrations
+        run: flask --app wsgi:app db upgrade
+      - name: Start Gunicorn
+        run: |
+          gunicorn --workers 2 --bind 0.0.0.0:8000 \
+            --access-logfile - --error-logfile - wsgi:app \
+            > "$RUNNER_TEMP/gunicorn.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/gunicorn.pid"
+      - name: Verify deployed health endpoint returns HTTP 200
+        run: |
+          for attempt in $(seq 1 30); do
+            status="$(curl --silent --output "$RUNNER_TEMP/health.json" \
+              --write-out '%{http_code}' http://127.0.0.1:8000/api/health || true)"
+            if [[ "$status" == "200" ]]; then
+              cat "$RUNNER_TEMP/health.json"
+              echo "Deployment smoke test passed: HTTP 200"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/gunicorn.log" >&2
+          echo "Deployment smoke test failed: /api/health did not return HTTP 200." >&2
+          exit 1
+      - name: Stop Gunicorn
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/gunicorn.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/gunicorn.pid")" 2>/dev/null || true
+          fi
