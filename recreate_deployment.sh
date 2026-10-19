@@ -28,9 +28,13 @@ if [[ "${EUID}" -ne 0 ]]; then
   exec sudo --preserve-env=APP_USER bash "${SCRIPT_PATH}" --apply
 fi
 
-APP_USER="${SUDO_USER:-${APP_USER:-}}"
+APP_USER="${APP_USER:-${SUDO_USER:-}}"
+if [[ -z "${APP_USER}" ]]; then
+  APP_USER="$(stat -c '%U' "${APP_DIR}")"
+fi
 if [[ -z "${APP_USER}" ]] || ! id "${APP_USER}" >/dev/null 2>&1 || [[ "${APP_USER}" == "root" ]]; then
-  echo "Error: ejecuta este script con sudo desde la cuenta no-root propietaria del checkout." >&2
+  echo "Error: root puede ejecutar el script, pero el servicio requiere un usuario no-root." >&2
+  echo "Indica APP_USER=<usuario> y asegúrate de que ese usuario puede acceder al checkout." >&2
   exit 1
 fi
 

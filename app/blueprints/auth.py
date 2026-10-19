@@ -12,7 +12,6 @@ from app.models import User
 from app.rate_limits import login_attempt_key, rate_limit_principal
 from app.schemas import AccountSchema, PasswordSchema, RegistrationSchema
 from app.security import PREAUTH_CSRF_SESSION_KEY, roles_required, validate_preauth_csrf
-from app.services.invitations import consume_invitation_if_valid
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -99,14 +98,6 @@ def register():
         return render_template(
             "auth/register.html",
             errors={"username": ["Ese nombre de usuario ya está en uso."]},
-            form=request.form,
-        ), 400
-
-    if not consume_invitation_if_valid(payload["invitation_code"]):
-        db.session.rollback()
-        return render_template(
-            "auth/register.html",
-            errors={"invitation_code": ["El código no es válido, ya se usó o ha caducado."]},
             form=request.form,
         ), 400
 

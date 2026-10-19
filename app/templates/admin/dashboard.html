@@ -2,14 +2,13 @@
 {% block title %}Administración — One Meal, One Speech{% endblock %}
 {% block content %}
 <section class="admin-heading">
-  <div><span class="eyebrow">PANEL PRIVADO · GMV / OMS</span><h1>Todo en su sitio.</h1><p>Programa charlas, invita a miembros y acompaña la conversación.</p></div>
-  <div class="admin-heading-actions"><a class="text-arrow" href="{{ url_for('admin.schedule_settings') }}">Disponibilidad ↗</a><a class="button button-dark" href="{{ url_for('admin.invitations') }}">+ Crear invitación</a></div>
+  <div><span class="eyebrow">PANEL PRIVADO · GMV / OMS</span><h1>Todo en su sitio.</h1><p>Programa charlas, gestiona miembros y acompaña la conversación.</p></div>
+  <div class="admin-heading-actions"><a class="text-arrow" href="{{ url_for('admin.schedule_settings') }}">Disponibilidad ↗</a></div>
 </section>
 <section class="admin-metrics">
   <article><span>01</span><strong>{{ upcoming_talks|length }}</strong><small>CHARLAS EN AGENDA</small></article>
   <article><span>02</span><strong>{{ members }}</strong><small>MIEMBROS ACTIVOS</small></article>
-  <article><span>03</span><strong>{{ pending_invitations }}</strong><small>INVITACIONES DISPONIBLES</small></article>
-  <article><span>04</span><strong>{{ total_talks }}</strong><small>PROPUESTAS TOTALES</small></article>
+  <article><span>03</span><strong>{{ total_talks }}</strong><small>PROPUESTAS TOTALES</small></article>
 </section>
 <section class="admin-section-heading"><div><span class="eyebrow">PROGRAMACIÓN</span><h2>Próximas exposiciones</h2></div><a class="text-arrow" href="{{ url_for('admin.users') }}">Gestionar miembros ↗</a></section>
 {% if upcoming_talks %}
@@ -19,5 +18,5 @@
       <form method="post" action="{{ url_for('admin.cancel_talk', talk_id=talk.id) }}" data-confirm="¿Cancelar esta charla?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="danger-action" type="submit">Cancelar</button></form></div></td></tr>{% endfor %}
   </tbody></table></div>
 {% else %}<section class="empty-state"><span class="empty-mark">00 / 00</span><h3>La agenda está despejada.</h3><p>Las nuevas propuestas aparecerán aquí automáticamente.</p></section>{% endif %}
-<section class="admin-shortcuts"><a href="{{ url_for('admin.invitations') }}"><span>01</span><strong>Invitaciones</strong><small>Generar códigos con caducidad ↗</small></a><a href="{{ url_for('admin.users') }}"><span>02</span><strong>Miembros</strong><small>Roles y accesos; contraseñas para superadmin ↗</small></a><a href="{{ url_for('admin.schedule_settings') }}"><span>03</span><strong>Disponibilidad</strong><small>Días, semanas y hora predeterminada ↗</small></a><a href="{{ url_for('public.statistics') }}"><span>04</span><strong>Estadísticas</strong><small>Ver el pulso de la comunidad ↗</small></a></section>
+<section class="admin-shortcuts"><a href="{{ url_for('admin.users') }}"><span>01</span><strong>Miembros</strong><small>Roles y accesos; contraseñas para superadmin ↗</small></a><a href="{{ url_for('admin.schedule_settings') }}"><span>02</span><strong>Disponibilidad</strong><small>Días, semanas y hora predeterminada ↗</small></a><a href="{{ url_for('public.statistics') }}"><span>03</span><strong>Estadísticas</strong><small>Ver el pulso de la comunidad ↗</small></a></section>
 {% endblock %}

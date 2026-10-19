@@ -54,15 +54,6 @@ class ScheduleRule(db.Model):
     )
 
 
-class Invitation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    code_hash = db.Column(db.String(64), unique=True, nullable=False)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    used_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
-    created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-
 class Talk(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(140), nullable=False)

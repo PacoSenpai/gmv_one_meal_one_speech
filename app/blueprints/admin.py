@@ -3,18 +3,17 @@ from __future__ import annotations
 import re
 import secrets
 import string
-from datetime import date, datetime, time
+from datetime import time
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from marshmallow import ValidationError
 
 from app.extensions import db, limiter
-from app.models import Comment, Invitation, ScheduleRule, ScheduleSetting, Talk, User, utc_now
+from app.models import Comment, ScheduleRule, ScheduleSetting, Talk, User, utc_now
 from app.rate_limits import rate_limit_principal
-from app.schemas import InvitationSchema, ProposalSchema
+from app.schemas import ProposalSchema
 from app.security import roles_required
-from app.services.dates import app_timezone, local_datetime, parse_local_datetime
-from app.services.invitations import create_invitation_code
+from app.services.dates import local_datetime, parse_local_datetime
 from app.services.scheduling import get_schedule_configuration, reschedule_future_talks
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -31,67 +30,12 @@ def dashboard():
         .order_by(Talk.event_at.asc())
         .all()
     )
-    pending_invitations = Invitation.query.filter(
-        Invitation.used_at.is_(None), Invitation.expires_at >= utc_now()
-    ).count()
     return render_template(
         "admin/dashboard.html",
         upcoming_talks=upcoming_talks,
         members=User.query.filter_by(role="member", is_active=True).count(),
-        pending_invitations=pending_invitations,
         total_talks=Talk.query.count(),
     )
-
-
-@admin_bp.route("/invitaciones", methods=["GET", "POST"])
-@roles_required("admin")
-@limiter.limit("10 per hour", key_func=rate_limit_principal, methods=["POST"])
-def invitations():
-    if request.method == "POST":
-        try:
-            payload = InvitationSchema().load(request.form.to_dict())
-        except ValidationError as error:
-            return render_template(
-                "admin/invitations.html",
-                invitations=_invitation_list(),
-                now=utc_now(),
-                errors=error.messages,
-                form=request.form,
-            ), 400
-
-        expires_on: date = payload["expires_at"]
-        if expires_on < datetime.now(app_timezone()).date():
-            return render_template(
-                "admin/invitations.html",
-                invitations=_invitation_list(),
-                now=utc_now(),
-                errors={"expires_at": ["La fecha de caducidad debe ser hoy o posterior."]},
-                form=request.form,
-            ), 400
-        invitation, code = create_invitation_code(expires_on, g.current_user.id)
-        db.session.add(invitation)
-        db.session.commit()
-        return render_template("admin/invitation_created.html", code=code, invitation=invitation)
-
-    return render_template("admin/invitations.html", invitations=_invitation_list(), now=utc_now())
-
-
-def _invitation_list() -> list[Invitation]:
-    return Invitation.query.order_by(Invitation.created_at.desc()).limit(50).all()
-
-
-@admin_bp.post("/invitaciones/<int:invitation_id>/revocar")
-@roles_required("admin")
-@limiter.limit("20 per minute", key_func=rate_limit_principal)
-def revoke_invitation(invitation_id: int):
-    invitation = db.get_or_404(Invitation, invitation_id)
-    if invitation.used_at is not None:
-        flash("Esta invitación ya se utilizó y no se puede revocar.", "error")
-        return redirect(url_for("admin.invitations"))
-    invitation.expires_at = utc_now()
-    db.session.commit()
-    flash("Invitación revocada.", "success")
-    return redirect(url_for("admin.invitations"))
 
 
 @admin_bp.get("/miembros")

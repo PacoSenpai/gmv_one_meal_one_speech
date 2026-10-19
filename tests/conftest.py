@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
 import pytest
 
 from app import create_app
 from app.extensions import db
-from app.models import Invitation, User, utc_now
-from app.services.invitations import hash_invitation_code
+from app.models import User
 
 
 @pytest.fixture
@@ -47,18 +44,3 @@ def admin_user(app):
         db.session.add(user)
         db.session.commit()
         return user.id
-
-
-@pytest.fixture
-def invitation(app, admin_user):
-    with app.app_context():
-        code = "invitation-code-for-tests"
-        db.session.add(
-            Invitation(
-                code_hash=hash_invitation_code(code),
-                expires_at=utc_now() + timedelta(days=2),
-                created_by_id=admin_user,
-            )
-        )
-        db.session.commit()
-        return code

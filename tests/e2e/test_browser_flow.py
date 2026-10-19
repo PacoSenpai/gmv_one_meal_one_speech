@@ -7,28 +7,12 @@ import pytest
 from werkzeug.serving import make_server
 
 from app.extensions import db
-from app.models import Invitation, Talk, User, utc_now
-from app.services.invitations import hash_invitation_code
+from app.models import Talk, User, utc_now
 
 
-def test_invited_member_can_publish_a_talk_in_a_real_browser(app):
+def test_public_member_can_register_and_publish_a_talk_in_a_real_browser(app):
     playwright_module = pytest.importorskip("playwright.sync_api")
     from playwright.sync_api import Error as PlaywrightError
-
-    code = "e2e-one-time-invitation"
-    with app.app_context():
-        admin = User(username="e2e_admin", role="admin")
-        admin.set_password("e2e-admin-secure-password")
-        db.session.add(admin)
-        db.session.flush()
-        db.session.add(
-            Invitation(
-                code_hash=hash_invitation_code(code),
-                expires_at=utc_now() + timedelta(days=1),
-                created_by_id=admin.id,
-            )
-        )
-        db.session.commit()
 
     server = make_server("127.0.0.1", 0, app)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -42,7 +26,6 @@ def test_invited_member_can_publish_a_talk_in_a_real_browser(app):
             pytest.skip(f"Chromium no está instalado: {error}")
         page = browser.new_page()
         page.goto(f"{base_url}/registro")
-        page.get_by_label("Código de invitación").fill(code)
         page.get_by_label("Nombre de usuario").fill("curious_member")
         page.get_by_label("Nombre completo").fill("Curious Member")
         page.get_by_label("Contraseña").fill("e2e-member-secure-password")

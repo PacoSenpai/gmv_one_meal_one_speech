@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 from io import BytesIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -11,8 +11,7 @@ from PIL import Image
 
 from app import create_app
 from app.extensions import db
-from app.models import Comment, Invitation, Reaction, Talk, TalkImage, TalkResource, User, utc_now
-from app.services.invitations import hash_invitation_code
+from app.models import Comment, Reaction, Talk, TalkImage, TalkResource, User, utc_now
 
 
 def csrf_value(client) -> str:
@@ -40,13 +39,16 @@ def login(client, username="admin", password="a-very-secure-password", next_url=
     )
 
 
-def test_invitation_registration_is_single_use(client, app, invitation):
+def test_public_registration_creates_active_member_without_invitation(client, app):
+    form = client.get("/registro")
+    assert form.status_code == 200
+    assert b"invitaci" not in form.data.lower()
+
     csrf_token = form_csrf_value(client, "/registro")
     response = client.post(
         "/registro",
         data={
             "csrf_token": csrf_token,
-            "invitation_code": invitation,
             "username": "new_member",
             "full_name": "New Member",
             "password": "a-different-secure-password",
@@ -59,19 +61,8 @@ def test_invitation_registration_is_single_use(client, app, invitation):
         assert created.full_name == "New Member"
         assert created.check_password("a-different-secure-password")
         assert not created.must_change_password
-        invitation_row = Invitation.query.filter_by(code_hash=hash_invitation_code(invitation)).one()
-        assert invitation_row.used_at is not None
-
-    repeated = client.post(
-        "/registro",
-        data={
-            "csrf_token": form_csrf_value(client, "/registro"),
-            "invitation_code": invitation,
-            "username": "second_member",
-            "password": "another-secure-password",
-        },
-    )
-    assert repeated.status_code == 400
+        assert created.is_active
+        assert not created.is_superadmin
 
 
 def test_public_proposal_is_scheduled_and_resources_are_saved(client, app, admin_user):
@@ -207,24 +198,10 @@ def test_public_pages_api_and_admin_pages_render(client, app, admin_user):
     assert client.get("/api/health").json == {"status": "ok"}
 
     login(client)
-    for path in ("/admin/", "/admin/invitaciones", "/admin/miembros", "/cuenta"):
+    for path in ("/admin/", "/admin/miembros", "/cuenta"):
         response = client.get(path)
         assert response.status_code == 200, path
-
-
-def test_admin_invitation_is_hashed_and_has_selected_expiry(client, app, admin_user):
-    login(client)
-    expires_on = datetime.now(ZoneInfo("Europe/Madrid")).date() + timedelta(days=3)
-    response = client.post(
-        "/admin/invitaciones",
-        data={"csrf_token": csrf_value(client), "expires_at": expires_on.isoformat()},
-    )
-    assert response.status_code == 200
-    generated_code = response.data.split(b'id="generated-code">')[1].split(b"<")[0].decode()
-    with app.app_context():
-        row = Invitation.query.one()
-        assert row.code_hash == hash_invitation_code(generated_code)
-        assert generated_code not in row.code_hash
+    assert client.get("/admin/invitaciones").status_code == 404
 
 
 def test_member_can_update_profile_and_password(client, app, admin_user):
@@ -497,7 +474,7 @@ def test_password_change_cannot_be_forced_by_query_parameter(client, app):
         assert not user.check_password("an-attacker-chosen-new-password")
 
 
-def test_anonymous_login_and_registration_require_preauth_csrf(client, app, admin_user, invitation):
+def test_anonymous_login_and_registration_require_preauth_csrf(client, app, admin_user):
     login_without_token = client.post(
         "/login",
         data={"username": "admin", "password": "a-very-secure-password"},
@@ -507,7 +484,6 @@ def test_anonymous_login_and_registration_require_preauth_csrf(client, app, admi
     register_without_token = client.post(
         "/registro",
         data={
-            "invitation_code": invitation,
             "username": "csrf_missing",
             "password": "a-different-secure-password",
         },

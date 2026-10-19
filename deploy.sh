@@ -23,7 +23,7 @@ if [[ -f "${SERVICE_PATH}" ]]; then
   exit 0
 fi
 
-APP_USER="${SUDO_USER:-${APP_USER:-}}"
+APP_USER="${APP_USER:-${SUDO_USER:-}}"
 if [[ -z "${APP_USER}" ]] || ! id "${APP_USER}" >/dev/null 2>&1; then
   echo "Error: ejecuta el script con sudo desde la cuenta que ejecutará la aplicación." >&2
   exit 1

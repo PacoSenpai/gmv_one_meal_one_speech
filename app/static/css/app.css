@@ -226,7 +226,7 @@ button { color: inherit; }
 .auth-aside p { max-width: 380px; color: #c4bdc1; font-size: 13px; }
 .auth-aside-index { position: absolute; bottom: 28px; left: 36px; color: #928991; font: 8px var(--mono); letter-spacing: .12em; }
 .auth-card { align-self: center; padding: clamp(32px, 6vw, 72px); }
-.auth-card h2, .settings-card h2, .invitation-history h2 { margin: 9px 0 25px; font: 600 31px var(--serif); }
+.auth-card h2, .settings-card h2 { margin: 9px 0 25px; font: 600 31px var(--serif); }
 .form-stack { display: flex; flex-direction: column; gap: 17px; }
 .form-stack label { display: flex; flex-direction: column; gap: 7px; color: var(--ink); font-size: 11px; font-weight: 800; }
 .form-stack input, .form-stack textarea, .form-stack select, .comment-compose textarea, .reply-form input { width: 100%; min-height: 45px; padding: 11px 12px; color: var(--ink); border: 1px solid #d7d1ca; border-radius: 0; outline: 0; background: #fff; font-size: 12px; font-weight: 500; transition: border .18s, box-shadow .18s; }
@@ -361,7 +361,7 @@ button { color: inherit; }
 .admin-heading h1 { margin: 8px 0 4px; font: 600 clamp(39px, 5vw, 57px)/1.05 var(--serif); letter-spacing: -.04em; }
 .admin-heading p { margin: 0; color: var(--muted); font-size: 12px; }
 .admin-heading-actions { display: flex; align-items: center; gap: 20px; }
-.admin-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 54px; background: var(--line); border: 1px solid var(--line); }
+.admin-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 54px; background: var(--line); border: 1px solid var(--line); }
 .admin-metrics article { min-height: 115px; padding: 16px 19px; background: #efebe3; }
 .admin-metrics article span { color: var(--red); font: 8px var(--mono); }
 .admin-metrics article strong { display: block; margin-top: 7px; font: 500 28px var(--mono); }
@@ -381,24 +381,12 @@ button { color: inherit; }
 .table-actions a:hover, .table-actions button:hover { text-decoration: underline; }
 .table-actions form { margin: 0; }
 .table-actions .danger-action { color: #827a7c; }
-.admin-shortcuts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 65px; background: var(--line); border: 1px solid var(--line); }
+.admin-shortcuts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 65px; background: var(--line); border: 1px solid var(--line); }
 .admin-shortcuts a { display: flex; flex-direction: column; min-height: 126px; padding: 16px 19px; background: var(--white); transition: background .2s; }
 .admin-shortcuts a:hover { background: #fff3f1; }
 .admin-shortcuts span { color: var(--red); font: 8px var(--mono); }
 .admin-shortcuts strong { margin: 10px 0 4px; font: 600 18px var(--serif); }
 .admin-shortcuts small { color: var(--muted); font-size: 9px; }
-.invitation-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: 30px; margin-bottom: 80px; }
-.invitation-history { padding: 27px; border: 1px solid var(--line); background: var(--white); }
-.invitation-history h2 { margin-bottom: 17px; }
-.invitation-list { border-top: 1px solid var(--line); }
-.invitation-list article { display: grid; grid-template-columns: 27px 1fr auto; align-items: center; gap: 10px; min-height: 59px; border-bottom: 1px solid #e9e4de; }
-.invitation-mark { color: var(--red); font-size: 15px; }
-.invitation-list article > div { display: flex; flex-direction: column; }
-.invitation-list strong { font-size: 10px; }
-.invitation-list small, .invitation-date { color: var(--muted); font: 8px var(--mono); }
-.invitation-list form { margin: 0; }
-.invitation-revoke { padding: 4px 6px; border: 0; color: var(--red); background: transparent; font: 8px var(--mono); cursor: pointer; }
-.invitation-revoke:hover { text-decoration: underline; }
 .one-time-secret { max-width: 660px; margin: 70px auto 85px; padding: clamp(25px, 6vw, 58px); background: var(--white); border: 1px solid var(--line); }
 .secret-icon { display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 22px; color: white; background: var(--red); font-size: 20px; }
 .one-time-secret h1 { margin: 10px 0; font: 600 clamp(34px, 5vw, 49px)/1.1 var(--serif); }
@@ -601,7 +589,7 @@ main > section, main > article { animation: rise-in .45s ease both; }
   .auth-aside h1 { font-size: 43px; }
   .auth-aside-index { left: 25px; bottom: 17px; }
   .auth-card { padding: 27px 22px; }
-  .settings-layout, .proposal-layout, .invitation-layout { grid-template-columns: 1fr; gap: 16px; }
+  .settings-layout, .proposal-layout { grid-template-columns: 1fr; gap: 16px; }
   .proposal-layout { gap: 20px; }
   .proposal-form, .settings-card { padding: 20px; }
   .proposal-aside { position: static; }
@@ -625,6 +613,7 @@ main > section, main > article { animation: rise-in .45s ease both; }
   .admin-heading-actions { width: 100%; justify-content: space-between; }
   .admin-metrics { grid-template-columns: 1fr 1fr; }
   .admin-metrics article { min-height: 100px; padding: 12px; }
+  .admin-metrics article:last-child { grid-column: 1 / -1; }
   .admin-section-heading { align-items: start; flex-direction: column; gap: 10px; }
   .admin-shortcuts { grid-template-columns: 1fr; }
   .one-time-secret { margin: 38px auto 55px; }

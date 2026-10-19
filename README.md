@@ -1,19 +1,19 @@
 # GMV One Meal, One Speech
 
-Portal público para descubrir las exposiciones del equipo, consultar el calendario y compartir conocimiento. Las cuentas se crean por invitación; los miembros pueden proponer charlas y el equipo de administración gestiona la agenda.
+Portal público para descubrir las exposiciones del equipo, consultar el calendario y compartir conocimiento. Cualquier persona con acceso al portal puede crear una cuenta de miembro, proponer charlas y participar en la conversación; el equipo de administración gestiona la agenda.
 
 ## Funcionalidades
 
 - Portada pública con próxima exposición, cuenta atrás y lista de charlas.
 - Agenda mensual y fichas con imágenes, enlaces y descripción.
-- Registro por invitación de un solo uso, cuentas de miembro y administración.
+- Registro abierto de cuentas de miembro, protegido con CSRF, contraseñas seguras y límites de solicitudes.
 - Propuestas publicadas automáticamente en el siguiente hueco disponible de la agenda (por defecto, el primer martes del mes a las 13:30, Europe/Madrid).
 - Sección **Mis charlas** para gestionar próximas exposiciones propias y consultar las realizadas.
 - El ponente puede editar o eliminar sus charlas futuras; al eliminar una, todas las charlas programadas posteriores avanzan un turno para cerrar el hueco. También puede ceder su turno intercambiando fechas con la siguiente charla.
 - Valoraciones y comentarios durante el periodo entre exposiciones; el administrador marca la charla como realizada para abrirlo y solo el ponente puede responder una vez a cada comentario.
 - Estadísticas públicas de charlas impartidas y más valoradas.
 - Agenda mensual configurable desde Administración: se pueden habilitar ocurrencias concretas de cada día de la semana y fijar una hora predeterminada. Al cambiar las reglas, todas las charlas futuras se recolocan manteniendo su orden.
-- Panel para administrar invitaciones, miembros, contraseñas temporales y fechas. El primer administrador creado con `flask create-admin` es el superadministrador protegido; al actualizar una base existente, se asigna al administrador activo más antiguo.
+- Panel para administrar miembros, contraseñas temporales y fechas. El primer administrador creado con `flask create-admin` es el superadministrador protegido; al actualizar una base existente, se asigna al administrador activo más antiguo.
 
 ## Requisitos
 
@@ -56,7 +56,7 @@ La suite contiene pruebas unitarias de programación, pruebas de integración co
 
 En producción, `deploy.sh` crea y protege `/etc/default/gmv-one-meal-one-speech` con claves aleatorias y la configuración del servicio; no usa el `.env` local. La base activa es `<checkout>/instance/portal.sqlite3`; las copias de seguridad de `update.sh` quedan en `<checkout>/instance/backups/`. Si el archivo de entorno ya existe y apunta a otra ubicación, el despliegue se detiene para evitar cambiar de base de datos accidentalmente.
 
-Para retirar intencionadamente la instalación anterior y crear una nueva desde cero, ejecuta `sudo ./recreate_deployment.sh --apply` desde el checkout definitivo, bajo la cuenta no-root que ejecutará el servicio. El script exige confirmar la ruta completa y borra la unidad, el entorno de producción, las bases y archivos de instancia conocidos y los entornos virtuales anterior y nuevo; conserva el código. Genera claves nuevas y una base vacía. No lo uses para una actualización normal.
+Para retirar intencionadamente la instalación anterior y crear una nueva desde cero, ejecuta `sudo ./recreate_deployment.sh --apply` desde el checkout definitivo. También puedes ejecutarlo directamente como `root` indicando `APP_USER=<usuario>`; systemd seguirá ejecutando la aplicación como ese usuario no-root. El checkout debe ser accesible por dicha cuenta y no puede estar bajo `/root`. El script exige confirmar la ruta completa y borra la unidad, el entorno de producción, las bases y archivos de instancia conocidos y los entornos virtuales anterior y nuevo; conserva el código. Genera claves nuevas y una base vacía. No lo uses para una actualización normal.
 
 Después de instalarlo, crea el administrador inicial con el mismo usuario del proceso, cargando la configuración de entorno que instaló el despliegue:
 
@@ -66,7 +66,7 @@ sudo -u "$USER" bash -c 'set -a; . /etc/default/gmv-one-meal-one-speech; set +a;
 
 Ejecuta `update.sh` desde una copia de trabajo limpia. Descarga cambios con `git pull --ff-only`, instala dependencias, guarda una copia de seguridad SQLite, aplica migraciones, reinicia el servicio y exige una respuesta HTTP 200 del endpoint de salud.
 
-El servicio escucha en `127.0.0.1:8000`. Configura el acceso HTTPS y el proxy de acuerdo con la infraestructura donde se ejecute.
+El servicio escucha en todas las interfaces IPv4 (`0.0.0.0:8000`), por lo que puede recibir conexiones desde otros equipos si la red y el firewall lo permiten. Para exponerlo fuera de una red de confianza, usa HTTPS mediante un proxy inverso; en producción las cookies requieren HTTPS (`COOKIE_SECURE=1`).
 
 ## Datos y configuración
 
@@ -75,7 +75,7 @@ El servicio escucha en `127.0.0.1:8000`. Configura el acceso HTTPS y el proxy de
 - Hay un límite general de 300 solicitudes por minuto y dirección IP; el acceso tiene además límites para intentos de autenticación y registro. Los límites no se desactivan si Redis no está disponible.
 - Si hay un proxy inverso delante de Gunicorn, configura `TRUSTED_PROXY_COUNT` con el número exacto de proxies que gestionan `X-Forwarded-For`; el proxy de borde debe reemplazar/normalizar esa cabecera. El valor predeterminado `0` no confía en cabeceras reenviadas.
 - Los administradores normales pueden ascender miembros, pero no degradar ni desactivar a otros administradores, ni restablecer contraseñas desde el panel. Solo el superadministrador puede gestionar contraseñas ajenas o retirar permisos de otros administradores; su propia cuenta no se puede degradar ni desactivar.
-- Los códigos de invitación, votos y comentarios se guardan en SQLite. Las contraseñas se almacenan con hash; los códigos de invitación se guardan como hash y las claves temporales solo se muestran al generarse.
+- Las cuentas, votos y comentarios se guardan en SQLite. Las contraseñas se almacenan con hash y las claves temporales solo se muestran al generarse.
 - La hora se almacena en UTC y se presenta en `Europe/Madrid`.
 
 ## Identidad visual

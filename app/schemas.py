@@ -7,7 +7,6 @@ class RegistrationSchema(Schema):
     class Meta:
         unknown = EXCLUDE
 
-    invitation_code = fields.String(required=True, validate=validate.Length(min=8, max=100))
     username = fields.String(required=True, validate=validate.Length(min=3, max=30))
     full_name = fields.String(load_default="", validate=validate.Length(max=120))
     password = fields.String(required=True, validate=validate.Length(min=12, max=256))
@@ -46,13 +45,6 @@ class CommentSchema(Schema):
     def validate_body(self, value: str, **_kwargs: object) -> None:
         if len(value.strip()) < 2:
             raise ValidationError("El comentario no puede estar vacío.")
-
-
-class InvitationSchema(Schema):
-    class Meta:
-        unknown = EXCLUDE
-
-    expires_at = fields.Date(required=True)
 
 
 class AccountSchema(Schema):
