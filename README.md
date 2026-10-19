@@ -48,7 +48,7 @@ pytest -q
 ruff check app tests wsgi.py
 ```
 
-La suite contiene pruebas unitarias de programación, pruebas de integración con el cliente de Flask y un flujo E2E de navegador. GitHub Actions ejecuta las pruebas y un smoke test de despliegue en cada push a cualquier rama y en pull requests a `main`; este último aplica migraciones, inicia Redis y Gunicorn con configuración de producción y exige HTTP 200 en `/api/health`.
+La suite contiene pruebas unitarias de programación, pruebas de integración con el cliente de Flask y un flujo E2E de navegador. GitHub Actions ejecuta las pruebas y un smoke test de despliegue en cada push a cualquier rama y en pull requests a `main`; este último instala Redis y el servicio con `deploy.sh`, y comprueba `systemctl stop`, `systemctl start` y HTTP 200 en `/api/health`.
 
 ## Despliegue y actualización
 

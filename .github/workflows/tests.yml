@@ -32,62 +32,63 @@ jobs:
   deployment-smoke-test:
     needs: test
     runs-on: ubuntu-24.04
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      APP_ENV: production
-      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
-      JWT_SECRET_KEY: ci-only-jwt-secret-key-not-for-production-9876543210
-      DATABASE_URL: sqlite:///portal.sqlite3
-      DATABASE_PATH: ${{ github.workspace }}/instance/portal.sqlite3
-      UPLOAD_FOLDER: ${{ github.workspace }}/instance/uploads
-      COOKIE_SECURE: "1"
-      RATELIMIT_STORAGE_URI: redis://127.0.0.1:6379/0
-      TRUSTED_PROXY_COUNT: "0"
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install application dependencies
-        run: python -m pip install -r requirements.txt
-      - name: Prepare production-like storage
-        run: mkdir -p instance/uploads
-      - name: Apply production database migrations
-        run: flask --app wsgi:app db upgrade
-      - name: Start Gunicorn
+      - name: Install and start Redis
         run: |
-          gunicorn --workers 2 --bind 0.0.0.0:8000 \
-            --access-logfile - --error-logfile - wsgi:app \
-            > "$RUNNER_TEMP/gunicorn.log" 2>&1 &
-          echo "$!" > "$RUNNER_TEMP/gunicorn.pid"
-      - name: Verify deployed health endpoint returns HTTP 200
+          sudo apt-get update
+          sudo apt-get install -y redis-server
+          sudo systemctl enable --now redis-server.service
+          sudo systemctl is-active --quiet redis-server.service
+      - name: Install the application with deploy.sh
+        run: sudo ./deploy.sh
+      - name: Verify the installed unit and network bind
         run: |
+          sudo systemctl is-enabled --quiet gmv-one-meal-one-speech.service
+          sudo ss -ltn | grep -F '0.0.0.0:8000'
+      - name: Verify systemctl stop stops the service
+        run: |
+          sudo systemctl stop gmv-one-meal-one-speech.service
+          if sudo systemctl is-active --quiet gmv-one-meal-one-speech.service; then
+            echo "El servicio sigue activo tras systemctl stop." >&2
+            exit 1
+          fi
+          status="$(curl --silent --connect-timeout 2 --max-time 5 \
+            --output /dev/null --write-out '%{http_code}' \
+            http://127.0.0.1:8000/api/health || true)"
+          if [[ "$status" == "200" ]]; then
+            echo "La API sigue respondiendo después de detener el servicio." >&2
+            exit 1
+          fi
+      - name: Verify systemctl start restores HTTP 200
+        run: |
+          if ! sudo systemctl start gmv-one-meal-one-speech.service; then
+            sudo systemctl status gmv-one-meal-one-speech.service --no-pager >&2 || true
+            sudo journalctl -u gmv-one-meal-one-speech.service -n 60 --no-pager >&2 || true
+            exit 1
+          fi
           for attempt in $(seq 1 30); do
-            status="$(curl --silent --output "$RUNNER_TEMP/health.json" \
+            status="$(curl --silent --connect-timeout 2 --max-time 5 \
+              --output "$RUNNER_TEMP/health.json" \
               --write-out '%{http_code}' http://127.0.0.1:8000/api/health || true)"
             if [[ "$status" == "200" ]]; then
+              sudo systemctl is-active --quiet gmv-one-meal-one-speech.service
               cat "$RUNNER_TEMP/health.json"
-              echo "Deployment smoke test passed: HTTP 200"
+              echo "systemctl stop/start verificado: HTTP 200"
               exit 0
             fi
             sleep 1
           done
-          cat "$RUNNER_TEMP/gunicorn.log" >&2
-          echo "Deployment smoke test failed: /api/health did not return HTTP 200." >&2
+          sudo systemctl status gmv-one-meal-one-speech.service --no-pager >&2 || true
+          sudo journalctl -u gmv-one-meal-one-speech.service -n 60 --no-pager >&2 || true
+          echo "El servicio no recuperó HTTP 200 después de systemctl start." >&2
           exit 1
-      - name: Stop Gunicorn
+      - name: Stop the test service
         if: always()
         run: |
-          if [[ -f "$RUNNER_TEMP/gunicorn.pid" ]]; then
-            kill "$(cat "$RUNNER_TEMP/gunicorn.pid")" 2>/dev/null || true
-          fi
+          sudo systemctl stop gmv-one-meal-one-speech.service 2>/dev/null || true
