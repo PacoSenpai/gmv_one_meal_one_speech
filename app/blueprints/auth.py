@@ -1,9 +1,27 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, g, make_response, redirect, render_template, request, session, url_for
-from flask_jwt_extended import create_access_token, jwt_required, set_access_cookies, unset_jwt_cookies
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    g,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    jwt_required,
+    set_access_cookies,
+    unset_jwt_cookies,
+)
 from flask_limiter.util import get_remote_address
 from marshmallow import ValidationError
 
@@ -16,13 +34,23 @@ from app.security import PREAUTH_CSRF_SESSION_KEY, roles_required, validate_prea
 auth_bp = Blueprint("auth", __name__)
 
 
-def _issue_login_response(user: User, destination: str):
+def _wants_long_session() -> bool:
+    return "1" in request.form.getlist("remember")
+
+
+def _issue_login_response(user: User, destination: str, *, remember: bool):
+    expires_delta = (
+        timedelta(days=current_app.config["SESSION_REMEMBER_DAYS"])
+        if remember
+        else current_app.config["JWT_ACCESS_TOKEN_EXPIRES"]
+    )
     token = create_access_token(
         identity=str(user.id),
-        additional_claims={"auth_version": user.auth_version},
+        additional_claims={"auth_version": user.auth_version, "remember": remember},
+        expires_delta=expires_delta,
     )
     response = make_response(redirect(destination))
-    set_access_cookies(response, token)
+    set_access_cookies(response, token, max_age=int(expires_delta.total_seconds()))
     return response
 
 
@@ -76,7 +104,7 @@ def login():
         else _safe_next_url(request.form.get("next"))
     )
     session.pop(PREAUTH_CSRF_SESSION_KEY, None)
-    return _issue_login_response(user, destination)
+    return _issue_login_response(user, destination, remember=_wants_long_session())
 
 
 @auth_bp.route("/registro", methods=["GET", "POST"])
@@ -111,7 +139,9 @@ def register():
         raise
     session.pop(PREAUTH_CSRF_SESSION_KEY, None)
     flash("Cuenta creada. ¡Bienvenido a las charlas!", "success")
-    return _issue_login_response(user, url_for("public.index"))
+    return _issue_login_response(
+        user, url_for("public.index"), remember=_wants_long_session()
+    )
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -186,4 +216,8 @@ def change_password():
     user.auth_version += 1
     db.session.commit()
     flash("Contraseña actualizada correctamente.", "success")
-    return _issue_login_response(user, url_for("public.index"))
+    return _issue_login_response(
+        user,
+        url_for("public.index"),
+        remember=bool(get_jwt().get("remember", False)),
+    )

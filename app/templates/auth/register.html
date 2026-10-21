@@ -9,6 +9,8 @@
       <label>Nombre de usuario<input name="username" value="{{ form.get('username', '') if form else '' }}" autocomplete="username" minlength="3" maxlength="30" required><small>Recomendamos usar un acrónimo como nombre de usuario.</small></label>
       <label>Nombre completo <span class="optional">OPCIONAL</span><input name="full_name" value="{{ form.get('full_name', '') if form else '' }}" autocomplete="name" maxlength="120"></label>
       <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" required><small>Al menos 12 caracteres.</small></label>
+      {% set remember_values = request.form.getlist('remember') %}
+      <label class="checkbox-field"><input type="hidden" name="remember" value="0"><input type="checkbox" name="remember" value="1"{% if not remember_values or '1' in remember_values %} checked{% endif %}><span>Mantener sesión iniciada durante {{ session_remember_days }} días</span></label>
       <button class="button button-dark button-full" type="submit">Crear mi cuenta <span aria-hidden="true">↗</span></button>
     </form>
     <p class="auth-switch">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión</a></p>

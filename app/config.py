@@ -4,6 +4,13 @@ import os
 from datetime import timedelta
 
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
 class Config:
     APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
     SECRET_KEY = os.environ.get("SECRET_KEY")
@@ -14,6 +21,8 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_TOKEN_LOCATION = ["cookies"]
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
+    JWT_SESSION_COOKIE = False
+    SESSION_REMEMBER_DAYS = _env_int("SESSION_REMEMBER_DAYS", 30)
     JWT_COOKIE_CSRF_PROTECT = True
     JWT_CSRF_CHECK_FORM = True
     JWT_CSRF_IN_COOKIES = True

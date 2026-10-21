@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, g, redirect, request, url_for
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask import Flask, flash, g, make_response, redirect, request, url_for
+from flask_jwt_extended import get_jwt_identity, unset_jwt_cookies, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from flask_restful import Api
 from sqlalchemy import event
@@ -92,6 +92,28 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return {"error": "invalid_token"}, 401
         return redirect(url_for("auth.login"))
 
+    def _jwt_session_error(error_code: str, message: str):
+        if request.path.startswith("/api/"):
+            return {"error": error_code}, 401
+        response = make_response(
+            redirect(url_for("auth.login", next=request.full_path))
+        )
+        unset_jwt_cookies(response)
+        flash(message, "error")
+        return response
+
+    @jwt.expired_token_loader
+    def expired_token(_jwt_header: dict[str, Any], _jwt_payload: dict[str, Any]):
+        return _jwt_session_error(
+            "token_expired", "Tu sesión ha caducado. Vuelve a iniciar sesión."
+        )
+
+    @jwt.revoked_token_loader
+    def revoked_token(_jwt_header: dict[str, Any], _jwt_payload: dict[str, Any]):
+        return _jwt_session_error(
+            "token_revoked", "Tu sesión ya no es válida. Vuelve a iniciar sesión."
+        )
+
     @app.before_request
     def load_current_user() -> None:
         g.current_user = None
@@ -146,6 +168,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "csrf_token": csrf_form_token,
             "local_datetime": local_datetime,
             "now": utc_now(),
+            "session_remember_days": app.config["SESSION_REMEMBER_DAYS"],
         }
 
     @app.errorhandler(413)
@@ -167,6 +190,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
 
 def _validate_security_config(app: Flask) -> None:
+    remember_days = app.config.get("SESSION_REMEMBER_DAYS")
+    if not isinstance(remember_days, int) or not 1 <= remember_days <= 365:
+        raise RuntimeError("SESSION_REMEMBER_DAYS debe ser un número entero entre 1 y 365.")
+
     is_production = (
         str(app.config.get("APP_ENV", "development")).strip().lower() == "production"
         or bool(app.config.get("DATABASE_PATH"))

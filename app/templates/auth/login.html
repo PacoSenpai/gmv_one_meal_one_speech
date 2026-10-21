@@ -9,6 +9,8 @@
       <input type="hidden" name="next" value="{{ next_url }}">
       <label>Nombre de usuario<input name="username" autocomplete="username" required autofocus></label>
       <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+      {% set remember_values = request.form.getlist('remember') %}
+      <label class="checkbox-field"><input type="hidden" name="remember" value="0"><input type="checkbox" name="remember" value="1"{% if not remember_values or '1' in remember_values %} checked{% endif %}><span>Mantener sesión iniciada durante {{ session_remember_days }} días</span></label>
       <button class="button button-dark button-full" type="submit">Entrar <span aria-hidden="true">↗</span></button>
     </form>
     <p class="auth-switch">¿Aún no tienes cuenta? <a href="{{ url_for('auth.register') }}">Regístrate</a></p>

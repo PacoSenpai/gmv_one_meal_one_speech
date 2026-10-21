@@ -7,6 +7,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from flask_jwt_extended import create_access_token, decode_token
 from PIL import Image
 
 from app import create_app
@@ -26,17 +27,17 @@ def form_csrf_value(client, path: str) -> str:
     return match.group(1).decode()
 
 
-def login(client, username="admin", password="a-very-secure-password", next_url=""):
+def login(client, username="admin", password="a-very-secure-password", next_url="", remember=None):
     csrf_token = form_csrf_value(client, "/login")
-    return client.post(
-        "/login",
-        data={
-            "username": username,
-            "password": password,
-            "csrf_token": csrf_token,
-            "next": next_url,
-        },
-    )
+    data = {
+        "username": username,
+        "password": password,
+        "csrf_token": csrf_token,
+        "next": next_url,
+    }
+    if remember is not None:
+        data["remember"] = "1" if remember else "0"
+    return client.post("/login", data=data)
 
 
 def test_public_registration_creates_active_member_without_invitation(client, app):
@@ -205,7 +206,7 @@ def test_public_pages_api_and_admin_pages_render(client, app, admin_user):
 
 
 def test_member_can_update_profile_and_password(client, app, admin_user):
-    login(client)
+    login(client, remember=True)
     profile_response = client.post(
         "/cuenta",
         data={
@@ -224,6 +225,14 @@ def test_member_can_update_profile_and_password(client, app, admin_user):
         },
     )
     assert password_response.status_code == 302
+    renewed_cookie = client.get_cookie("access_token_cookie")
+    assert renewed_cookie is not None
+    with app.app_context():
+        renewed_claims = decode_token(renewed_cookie.value)
+    assert renewed_claims["remember"] is True
+    assert renewed_claims["exp"] - renewed_claims["iat"] == int(
+        timedelta(days=app.config["SESSION_REMEMBER_DAYS"]).total_seconds()
+    )
     with app.app_context():
         user = db.session.get(User, admin_user)
         assert user.username == "updated_admin"
@@ -507,6 +516,96 @@ def test_login_redirect_rejects_backslash_and_external_targets(client, admin_use
         response = login(client, next_url=target)
         assert response.status_code == 302
         assert response.headers["Location"] == "/"
+
+
+def test_login_form_checks_remember_session_by_default(client):
+    response = client.get("/login")
+    assert b'name="remember" value="1" checked' in response.data
+
+
+def _session_lifetime(client, app, response):
+    cookie = client.get_cookie("access_token_cookie")
+    assert cookie is not None
+    with app.app_context():
+        claims = decode_token(cookie.value)
+    set_cookie = next(
+        header
+        for header in response.headers.getlist("Set-Cookie")
+        if header.startswith("access_token_cookie=")
+    )
+    if not isinstance(set_cookie, str):
+        set_cookie = "; ".join(set_cookie)
+    return claims, set_cookie, claims["exp"] - claims["iat"]
+
+
+def test_remember_me_extends_session_to_configured_days(client, app, admin_user):
+    response = login(client, remember=True)
+    assert response.status_code == 302
+    claims, set_cookie, lifetime = _session_lifetime(client, app, response)
+    expected = int(timedelta(days=app.config["SESSION_REMEMBER_DAYS"]).total_seconds())
+    assert claims["remember"] is True
+    assert lifetime == expected
+    assert f"Max-Age={expected}" in set_cookie
+
+
+def test_login_without_remember_keeps_eight_hour_session(client, app, admin_user):
+    response = login(client, remember=False)
+    assert response.status_code == 302
+    claims, set_cookie, lifetime = _session_lifetime(client, app, response)
+    assert claims["remember"] is False
+    expected = int(timedelta(hours=8).total_seconds())
+    assert lifetime == expected
+    assert f"Max-Age={expected}" in set_cookie
+
+
+def test_registration_can_start_a_long_session(client, app):
+    csrf_token = form_csrf_value(client, "/registro")
+    response = client.post(
+        "/registro",
+        data={
+            "csrf_token": csrf_token,
+            "username": "long_session_member",
+            "full_name": "Long Session Member",
+            "password": "a-different-secure-password",
+            "remember": "1",
+        },
+    )
+    assert response.status_code == 302
+    claims, _set_cookie, lifetime = _session_lifetime(client, app, response)
+    assert claims["remember"] is True
+    assert lifetime == int(
+        timedelta(days=app.config["SESSION_REMEMBER_DAYS"]).total_seconds()
+    )
+
+
+def test_expired_session_redirects_to_login_instead_of_json(client, app, admin_user):
+    with app.app_context():
+        token = create_access_token(
+            identity=str(admin_user),
+            additional_claims={"auth_version": 0, "remember": True},
+            expires_delta=timedelta(seconds=-1),
+        )
+    client.set_cookie("access_token_cookie", token)
+    response = client.get("/cuenta")
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+    assert b"Token has expired" not in response.data
+    followed = client.get(response.headers["Location"])
+    assert "Tu sesión ha caducado".encode() in followed.data
+
+
+def test_revoked_session_redirects_to_login_instead_of_json(client, app, admin_user):
+    login(client, remember=True)
+    with app.app_context():
+        user = db.session.get(User, admin_user)
+        user.auth_version += 1
+        db.session.commit()
+    response = client.get("/cuenta")
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+    assert b"Token has been revoked" not in response.data
+    followed = client.get(response.headers["Location"])
+    assert "Tu sesión ya no es válida".encode() in followed.data
 
 
 def test_oversized_login_fields_are_rejected_before_password_hash_check(client, app, admin_user):
